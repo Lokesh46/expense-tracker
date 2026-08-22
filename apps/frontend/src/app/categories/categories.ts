@@ -21,7 +21,7 @@ export class CategoriesComponent implements OnInit {
   isLoading = signal(false);
   isFormLoading = signal(false);
   showCreateForm = signal(false);
-  editingCategoryId = signal<string | null>(null);
+  editingCategoryId = signal<number | null>(null);
   categoryForm: FormGroup;
 
   constructor() {
@@ -105,7 +105,7 @@ export class CategoriesComponent implements OnInit {
     });
   }
 
-  onDeleteClick(id: string): void {
+  onDeleteClick(id: number): void {
     if (confirm('Are you sure you want to delete this category?')) {
       this.categoryService.deleteCategory(id).subscribe({
         next: () => {

@@ -59,14 +59,12 @@
         <thead>
           <tr>
             <th>Category Name</th>
-            <th>Created At</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           <tr *ngFor="let category of categories()">
             <td>{{ category.name }}</td>
-            <td>{{ category.createdAt ? (category.createdAt | date: 'short') : 'N/A' }}</td>
             <td class="actions-cell">
               <button
                 type="button"

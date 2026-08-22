@@ -29,7 +29,7 @@ export class TransactionsComponent implements OnInit {
   isCategoriesLoading = signal(false);
   isFormLoading = signal(false);
   showCreateForm = signal(false);
-  editingTransactionId = signal<string | null>(null);
+  editingTransactionId = signal<number | null>(null);
   transactionForm: FormGroup;
   filterForm: FormGroup;
 
@@ -119,6 +119,7 @@ export class TransactionsComponent implements OnInit {
     const payload: CreateTransactionRequest = {
       ...formValue,
       amount: Number.parseFloat(formValue.amount),
+      categoryId: Number(formValue.categoryId),
     };
 
     this.transactionService.createTransaction(payload).subscribe({
@@ -173,6 +174,7 @@ export class TransactionsComponent implements OnInit {
     const payload = {
       ...formValue,
       amount: Number.parseFloat(formValue.amount),
+      categoryId: Number(formValue.categoryId),
     };
 
     this.transactionService.updateTransaction(transactionId, payload).subscribe({
@@ -191,7 +193,7 @@ export class TransactionsComponent implements OnInit {
     });
   }
 
-  onDeleteClick(id: string): void {
+  onDeleteClick(id: number): void {
     if (confirm('Are you sure you want to delete this transaction?')) {
       this.transactionService.deleteTransaction(id).subscribe({
         next: () => {
@@ -212,7 +214,7 @@ export class TransactionsComponent implements OnInit {
     this.editingTransactionId.set(null);
   }
 
-  getCategoryName(categoryId: string): string {
+  getCategoryName(categoryId: number): string {
     const category = this.categories().find((c) => c.id === categoryId);
     return category?.name || 'Unknown';
   }
@@ -227,7 +229,7 @@ export class TransactionsComponent implements OnInit {
 
     const filtered = all.filter((t) => {
       // Category filter
-      if (f.categoryId && f.categoryId !== '' && t.categoryId !== f.categoryId) return false;
+      if (f.categoryId && f.categoryId !== '' && t.categoryId !== Number(f.categoryId)) return false;
 
       // Payment method
       if (f.paymentMethod && f.paymentMethod !== '' && t.paymentMethod !== f.paymentMethod) return false;

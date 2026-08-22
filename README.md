@@ -28,7 +28,7 @@ That starts both halves:
 
 | | URL |
 |---|---|
-| Frontend | http://localhost:4200 |
+| Frontend | http://localhost:4300 |
 | API | http://localhost:8081 |
 | H2 console (dev only) | http://localhost:8081/h2-console |
 

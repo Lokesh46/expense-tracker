@@ -126,7 +126,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     });
   }
 
-  getCategoryName(categoryId: string): string {
+  getCategoryName(categoryId: number): string {
     return this.categories().find(c => c.id === categoryId)?.name || 'Unknown';
   }
 
@@ -226,13 +226,13 @@ export class DashboardComponent implements OnInit, AfterViewInit {
 
   private calculateCategoryData(): CategoryData[] {
     const filtered = this.filteredTransactionsComputed();
-    const categoryMap = new Map<string, number>();
-    const categoryNameMap = new Map<string, string>();
-    const categoryColorMap = new Map<string, string>();
+    const categoryMap = new Map<number, number>();
+    const categoryNameMap = new Map<number, string>();
+    const categoryColorMap = new Map<number, string>();
 
     // Sum by category from filtered data
     for (const txn of filtered) {
-      const catId = txn.categoryId || '0';
+      const catId = txn.categoryId ?? 0;
       categoryMap.set(catId, (categoryMap.get(catId) || 0) + (txn.amount || 0));
     }
 
@@ -255,12 +255,12 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   }
 
   private calculateCategoryDataFiltered(): CategoryData[] {
-    const categoryMap = new Map<string, { name: string; total: number }>();
+    const categoryMap = new Map<number, { name: string; total: number }>();
     const filteredTxns = this.filteredTransactionsComputed();
 
     // Sum by category for filtered transactions and collect names
     for (const txn of filteredTxns) {
-      const catId = txn.categoryId || '0';
+      const catId = txn.categoryId ?? 0;
       const current = categoryMap.get(catId);
       const catName = this.categories().find(c => c.id === catId)?.name || 'Unknown';
       
@@ -282,9 +282,9 @@ export class DashboardComponent implements OnInit, AfterViewInit {
       .sort((a, b) => b.total - a.total);
   }
 
-  private getCategoryColor(categoryName: string, categoryId?: string): string {
-    // Use categoryId for consistent color assignment
-    const key = categoryId || categoryName.toLowerCase();
+  private getCategoryColor(categoryName: string, categoryId?: number): string {
+    // Keyed by id where available so a category keeps its colour if renamed.
+    const key = categoryId !== undefined ? String(categoryId) : categoryName.toLowerCase();
 
     // Check cache first
     if (this.categoryColorCache.has(key)) {
