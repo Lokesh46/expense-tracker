@@ -1,88 +1,63 @@
-import { Component, DestroyRef, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Component, inject, signal } from '@angular/core';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import { AuthService } from '../core/services/auth.service';
+import { NotificationService } from '../core/services/notification.service';
+import { AuthLayoutComponent } from '../shared/auth-layout/auth-layout';
+import { describeError } from '../core/utils/api-error';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, AuthLayoutComponent],
   templateUrl: './login.html',
   styleUrl: './login.css',
 })
 export class Login {
-  private readonly fb = inject(FormBuilder);
-  private readonly authService = inject(AuthService);
-  private readonly destroyRef = inject(DestroyRef);
+  private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+  private readonly notifications = inject(NotificationService);
+  private readonly fb = inject(FormBuilder);
 
-  readonly loginForm = this.fb.nonNullable.group({
-    username: ['', [Validators.required]],
-    password: ['', [Validators.required, Validators.minLength(6)]],
-    rememberMe: [false],
-  });
-
-  readonly formErrorMessages = {
-    username: {
-      required: 'Username is required.',
-    },
-    password: {
-      required: 'Password is required.',
-      minlength: 'Password must include at least 6 characters.',
-    },
-  };
-
-  protected submitted = false;
   protected readonly isSubmitting = signal(false);
   protected readonly errorMessage = signal<string | null>(null);
-  protected readonly successMessage = signal<string | null>(null);
+  protected readonly showPassword = signal(false);
 
-  onSubmit(): void {
-    this.submitted = true;
-    this.errorMessage.set(null);
-    this.successMessage.set(null);
+  protected readonly form = this.fb.nonNullable.group({
+    username: ['', [Validators.required]],
+    password: ['', [Validators.required]],
+    rememberMe: [true],
+  });
 
-    if (this.loginForm.invalid) {
-      this.loginForm.markAllAsTouched();
+  protected submit(): void {
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
       return;
     }
 
-    const { username, password, rememberMe } = this.loginForm.getRawValue();
     this.isSubmitting.set(true);
+    this.errorMessage.set(null);
 
-    this.authService
-      .authenticate({ username, password }, { rememberMe })
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: () => {
-          this.isSubmitting.set(false);
-          this.successMessage.set('Login successful. Redirecting...');
-          setTimeout(() => this.router.navigate(['/home']), 1000);
-        },
-        error: () => {
-          this.isSubmitting.set(false);
-          this.errorMessage.set('Invalid credentials. Please try again.');
-        },
-      });
+    const { username, password, rememberMe } = this.form.getRawValue();
+
+    this.auth.authenticate({ username, password }, { rememberMe }).subscribe({
+      next: () => {
+        this.notifications.showSuccess(`Welcome back, ${username}.`);
+        // Honour the deep link the auth guard interrupted, if there was one.
+        const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
+        this.router.navigateByUrl(returnUrl || '/dashboard');
+      },
+      error: (err) => {
+        this.isSubmitting.set(false);
+        this.errorMessage.set(describeError(err, 'Invalid username or password.'));
+      },
+    });
   }
 
-  showError(controlName: 'username' | 'password'): string | null {
-    const control = this.loginForm.get(controlName);
-    if (!control) {
-      return null;
-    }
-
-    if (!(control.invalid && (control.touched || this.submitted))) {
-      return null;
-    }
-
-    const errors = control.errors ?? {};
-    const messages = this.formErrorMessages[controlName];
-    return Object.keys(errors)
-      .map((key) => messages[key as keyof typeof messages])
-      .find(Boolean) ?? null;
+  protected invalid(field: 'username' | 'password'): boolean {
+    const control = this.form.controls[field];
+    return control.invalid && control.touched;
   }
 }

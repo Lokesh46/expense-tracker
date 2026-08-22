@@ -1,126 +1,185 @@
-<div class="dashboard-container">
-  <h1 class="dashboard-title">Analytics Dashboard</h1>
-
-  <!-- KPI Cards -->
-  <div class="kpi-cards">
-    <div class="kpi-card">
-      <div class="kpi-label">Total Expenses</div>
-      <div class="kpi-value">₹{{ totalExpenses().toFixed(2) }}</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Average Expense</div>
-      <div class="kpi-value">₹{{ averageExpense().toFixed(2) }}</div>
-    </div>
-    <div class="kpi-card" *ngIf="topCategory()">
-      <div class="kpi-label">Top Category</div>
-      <div class="kpi-value">{{ topCategory()!.name }}</div>
-      <div class="kpi-subtext">₹{{ topCategory()!.total.toFixed(2) }}</div>
-    </div>
+<header class="page-head rise rise-1">
+  <div class="page-title">
+    <p class="eyebrow">Overview</p>
+    <h1>{{ monthLabel() }}</h1>
   </div>
 
-  <!-- Controls - PRIMARY FILTER -->
-  <div class="controls-section">
-    <div class="control-group">
-      <label id="viewLabel">View:</label>
-      <div class="button-group" role="radiogroup" aria-labelledby="viewLabel">
-        <button
-          class="toggle-btn"
-          role="radio"
-          [attr.aria-checked]="viewMode() === 'month'"
-          [class.active]="viewMode() === 'month'"
-          (click)="onViewModeChange('month')"
-        >
-          Monthly
-        </button>
-        <button
-          class="toggle-btn"
-          role="radio"
-          [attr.aria-checked]="viewMode() === 'year'"
-          [class.active]="viewMode() === 'year'"
-          (click)="onViewModeChange('year')"
-        >
-          Yearly
-        </button>
-      </div>
+  <div class="row head-actions">
+    <div class="month-nav">
+      <button type="button" class="month-btn" (click)="shiftMonth(-1)" aria-label="Previous month">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+      </button>
+      <button type="button" class="month-btn" (click)="shiftMonth(1)" aria-label="Next month">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
+      </button>
     </div>
+    <a class="btn btn-primary btn-sm" routerLink="/transactions">Open ledger</a>
+  </div>
+</header>
 
-    <div class="control-group">
-      <label for="yearSelect">Year:</label>
-      <select id="yearSelect" [ngModel]="selectedYear()" (ngModelChange)="onYearChange($event)">
-        <option *ngFor="let year of getAvailableYears()" [ngValue]="year">{{ year }}</option>
-      </select>
-    </div>
+<!-- ------------------------------------------------------------- headline -->
+<section class="headline rise rise-2">
+  <div class="headline-main">
+    <p class="eyebrow">Total spent</p>
+    <p class="figure headline-value">{{ money(total()) }}</p>
 
-    <div class="control-group" *ngIf="viewMode() === 'month'">
-      <label for="monthSelect">Month:</label>
-      <select id="monthSelect" [ngModel]="selectedMonth()" (ngModelChange)="onMonthChange($event)">
-        <option *ngFor="let month of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]; let i = index" [ngValue]="month">
-          {{ getMonthName(month) }}
-        </option>
-      </select>
-    </div>
+    <p class="headline-change" [class.is-up]="(change() ?? 0) > 0" [class.is-down]="(change() ?? 0) < 0">
+      {{ changeLabel() }}
+    </p>
+
+    @if (mixedCurrencies()) {
+      <p class="mixed-warning">
+        This month mixes currencies, so the total above adds unlike amounts. By currency:
+        @for (entry of currencyBreakdown(); track entry.currency) {
+          <span class="figure mixed-item">{{ formatTotal(entry) }}</span>
+        }
+      </p>
+    }
   </div>
 
-  <!-- Charts Grid - Compact Layout -->
-  <div class="charts-grid">
-    <!-- Monthly Chart - Only show in YEAR view -->
-    <div class="chart-container" *ngIf="viewMode() === 'year'">
-      <h3 class="chart-title">Monthly Expenses - {{ selectedYear() }}</h3>
-      <canvas #monthlyChart class="chart"></canvas>
+  <dl class="headline-stats">
+    <div>
+      <dt class="eyebrow">Entries</dt>
+      <dd class="figure">{{ current().length }}</dd>
     </div>
-
-    <!-- Daily Chart - Only show in MONTH view -->
-    <div class="chart-container" *ngIf="viewMode() === 'month'">
-      <h3 class="chart-title">Daily Expenses - {{ getMonthName(selectedMonth()) }}</h3>
-      <canvas #dailyChart class="chart"></canvas>
+    <div>
+      <dt class="eyebrow">Largest category</dt>
+      <dd>
+        @if (topCategory(); as top) {
+          <span class="row">
+            <span class="dot" [style.background]="top.color"></span>
+            {{ top.name }}
+          </span>
+        } @else {
+          <span class="text-tertiary">—</span>
+        }
+      </dd>
     </div>
-
-    <!-- Category Chart - Always show -->
-    <div class="chart-container">
-      <h3 class="chart-title">Category Breakdown</h3>
-      <canvas #categoryChart class="chart"></canvas>
+    <div>
+      <dt class="eyebrow">Over budget</dt>
+      <dd class="figure" [class.text-negative]="overBudget().length > 0">
+        {{ overBudget().length }}
+      </dd>
     </div>
-  </div>
+  </dl>
+</section>
 
-  <!-- Category Breakdown Table - Compact -->
-  <div class="category-breakdown">
-    <h2 class="section-title">Category Details</h2>
-    <div class="breakdown-table">
-      <div class="breakdown-header">
-        <div class="col-name">Category</div>
-        <div class="col-amount">Amount</div>
-        <div class="col-percentage">%</div>
-      </div>
-      <div class="breakdown-row" *ngFor="let cat of categoryDataFiltered()">
-        <div class="col-name">
-          <span class="color-dot" [style.background-color]="cat.color"></span>
-          {{ cat.name }}
+<!-- --------------------------------------------------------------- charts -->
+<section class="charts rise rise-3">
+  <article class="panel chart-panel">
+    <header class="panel-header">
+      <h2>Daily spend</h2>
+      <span class="eyebrow">{{ monthLabel() }}</span>
+    </header>
+    <div class="panel-body chart-body">
+      @if (current().length === 0 && !isLoading()) {
+        <div class="empty">
+          <h3>Nothing recorded yet</h3>
+          <p>Entries for this month will appear here as a day-by-day trace.</p>
+          <a class="btn btn-primary btn-sm" routerLink="/transactions">Record an expense</a>
         </div>
-        <div class="col-amount">₹{{ cat.total.toFixed(2) }}</div>
-        <div class="col-percentage">
-          <div class="percentage-bar">
-            <div class="percentage-fill" [style.width.%]="cat.percentage" [style.background-color]="cat.color"></div>
+      } @else {
+        <canvas #trendChart aria-label="Spending by day" role="img"></canvas>
+      }
+    </div>
+  </article>
+
+  <article class="panel chart-panel">
+    <header class="panel-header">
+      <h2>Where it went</h2>
+    </header>
+    <div class="panel-body split-body">
+      @if (categorySlices().length === 0) {
+        <div class="empty"><p>No categories to break down yet.</p></div>
+      } @else {
+        <div class="ring">
+          <canvas #splitChart aria-label="Spending by category" role="img"></canvas>
+          <div class="ring-centre">
+            <span class="eyebrow">Total</span>
+            <span class="figure ring-value">{{ money(total()) }}</span>
           </div>
-          <span class="percentage-text">{{ cat.percentage }}%</span>
         </div>
-      </div>
-    </div>
-  </div>
 
-  <!-- Top Transactions -->
-  <div class="top-transactions-section">
-    <h2 class="section-title">Top 5 Transactions</h2>
-    <div class="transactions-list">
-      <div class="transaction-item" *ngFor="let txn of topTransactions()">
-        <div class="transaction-info">
-          <div class="transaction-category">{{ getCategoryName(txn.categoryId) }}</div>
-          <div class="transaction-date">{{ (txn.date | date:'MMM d, y') }}</div>
-        </div>
-        <div class="transaction-amount">₹{{ txn.amount.toFixed(2) }}</div>
-      </div>
-      <div class="no-transactions" *ngIf="topTransactions().length === 0">
-        No transactions in selected period
-      </div>
+        <ul class="legend">
+          @for (slice of categorySlices(); track slice.name) {
+            <li>
+              <span class="dot" [style.background]="slice.color"></span>
+              <span class="legend-name">{{ slice.name }}</span>
+              <span class="figure legend-share">{{ slice.share.toFixed(0) }}%</span>
+              <span class="figure legend-value">{{ money(slice.total) }}</span>
+            </li>
+          }
+        </ul>
+      }
     </div>
-  </div>
-</div>
+  </article>
+</section>
+
+<!-- -------------------------------------------------------------- budgets -->
+@if (budgets().length > 0) {
+  <section class="panel rise rise-4">
+    <header class="panel-header">
+      <h2>Budgets</h2>
+      <a class="btn btn-ghost btn-sm" routerLink="/budgets">Manage</a>
+    </header>
+    <div class="panel-body budget-strip">
+      @for (budget of budgets(); track budget.id) {
+        <div class="budget-mini">
+          <div class="row-between">
+            <span class="budget-mini-name">{{ budget.categoryName }}</span>
+            <span
+              class="figure budget-mini-pct"
+              [class.text-negative]="budget.exceeded"
+            >
+              {{ budget.percentUsed }}%
+            </span>
+          </div>
+          <div
+            class="meter"
+            role="progressbar"
+            [attr.aria-valuenow]="budget.percentUsed"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            [attr.aria-label]="budget.categoryName"
+          >
+            <div
+              class="meter-fill"
+              [class.is-over]="budget.exceeded"
+              [class.is-safe]="!budget.exceeded && budget.percentUsed < 80"
+              [style.width.%]="budget.percentUsed > 100 ? 100 : budget.percentUsed"
+            ></div>
+          </div>
+          <span class="budget-mini-detail text-tertiary figure">
+            {{ money(budget.spent) }} / {{ money(budget.monthlyLimit) }}
+          </span>
+        </div>
+      }
+    </div>
+  </section>
+}
+
+<!-- --------------------------------------------------------------- recent -->
+<section class="panel rise rise-4">
+  <header class="panel-header">
+    <h2>Latest entries</h2>
+    <a class="btn btn-ghost btn-sm" routerLink="/transactions">See all</a>
+  </header>
+
+  @if (recent().length === 0) {
+    <div class="empty">
+      <p>Nothing recorded for {{ monthLabel() }}.</p>
+    </div>
+  } @else {
+    <ul class="recent">
+      @for (item of recent(); track item.id) {
+        <li>
+          <span class="dot" [style.background]="categoryColor(item.categoryId)"></span>
+          <span class="recent-desc">{{ item.description }}</span>
+          <span class="chip recent-cat">{{ item.categoryName }}</span>
+          <span class="figure recent-date">{{ item.date }}</span>
+          <span class="figure recent-amount">{{ money(item.amount) }}</span>
+        </li>
+      }
+    </ul>
+  }
+</section>

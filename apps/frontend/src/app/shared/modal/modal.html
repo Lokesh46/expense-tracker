@@ -1,0 +1,27 @@
+<div class="backdrop" (click)="close()"></div>
+
+<div
+  class="panel-shell"
+  [class.is-wide]="width() === 'wide'"
+  role="dialog"
+  aria-modal="true"
+  [attr.aria-label]="heading()"
+  tabindex="-1"
+  #panel
+>
+  <header class="modal-head">
+    <div>
+      <h2>{{ heading() }}</h2>
+      @if (description(); as text) {
+        <p class="modal-description">{{ text }}</p>
+      }
+    </div>
+    <button type="button" class="modal-close" (click)="close()" aria-label="Close">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+    </button>
+  </header>
+
+  <div class="modal-body">
+    <ng-content />
+  </div>
+</div>

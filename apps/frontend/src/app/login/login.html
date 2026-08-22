@@ -1,73 +1,64 @@
-<section class="page-card login-wrapper">
-  <header class="login-header">
-    <span class="welcome-badge">Sign in</span>
-    <h2>Welcome back, planner</h2>
-    <p class="subtitle">Access your dashboard to manage expenses and budgets.</p>
-  </header>
+<app-auth-layout
+  eyebrow="Sign in"
+  heading="Welcome back"
+  blurb="Pick up where your ledger left off."
+>
+  <form class="auth-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    @if (errorMessage(); as message) {
+      <p class="form-alert" role="alert">{{ message }}</p>
+    }
 
-  <div *ngIf="errorMessage()" class="alert error">{{ errorMessage() }}</div>
-  <div *ngIf="successMessage()" class="alert success">{{ successMessage() }}</div>
-
-  <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" novalidate>
-    <div class="form-field">
+    <div class="field">
       <label for="username">Username</label>
       <input
         id="username"
+        class="input"
         type="text"
         formControlName="username"
         autocomplete="username"
-        placeholder="Enter your username"
-        [class.invalid]="showError('username')"
+        [class.is-invalid]="invalid('username')"
       />
-      <span *ngIf="showError('username')" class="field-error">
-        {{ showError('username') }}
-      </span>
+      @if (invalid('username')) {
+        <span class="field-error">Enter your username.</span>
+      }
     </div>
 
-    <div class="form-field">
+    <div class="field">
       <label for="password">Password</label>
-      <input
-        id="password"
-        type="password"
-        formControlName="password"
-        autocomplete="current-password"
-        placeholder="Enter your password"
-        [class.invalid]="showError('password')"
-      />
-      <span *ngIf="showError('password')" class="field-error">
-        {{ showError('password') }}
-      </span>
+      <div class="password-wrap">
+        <input
+          id="password"
+          class="input"
+          [type]="showPassword() ? 'text' : 'password'"
+          formControlName="password"
+          autocomplete="current-password"
+          [class.is-invalid]="invalid('password')"
+        />
+        <button
+          type="button"
+          class="password-toggle"
+          (click)="showPassword.set(!showPassword())"
+          [attr.aria-label]="showPassword() ? 'Hide password' : 'Show password'"
+        >
+          {{ showPassword() ? 'Hide' : 'Show' }}
+        </button>
+      </div>
+      @if (invalid('password')) {
+        <span class="field-error">Enter your password.</span>
+      }
     </div>
 
-    <div class="form-meta">
-      <label class="remember-me">
-        <input type="checkbox" formControlName="rememberMe" />
-        <span>Remember me</span>
-      </label>
+    <label class="remember">
+      <input type="checkbox" formControlName="rememberMe" />
+      <span>Keep me signed in on this device</span>
+    </label>
 
-      <a class="help-link" routerLink="/register">Create account</a>
-    </div>
-
-    <button type="submit" class="submit-btn" [disabled]="isSubmitting()">
-      <span *ngIf="!isSubmitting(); else loading">Log in</span>
+    <button type="submit" class="btn btn-primary btn-block" [disabled]="isSubmitting()">
+      {{ isSubmitting() ? 'Signing in…' : 'Sign in' }}
     </button>
-    <ng-template #loading>
-      <span class="loading">Signing you in...</span>
-    </ng-template>
-  </form>
 
-  <div class="divider">
-    <span>or</span>
-  </div>
-
-  <div class="alternative-actions">
-    <button type="button" class="ghost-btn">
-      <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" />
-      Continue with Google
-    </button>
-    <p class="signup-copy">
-      Prefer to register later?
-      <a routerLink="/register">Sign up now</a>
+    <p class="auth-switch">
+      No account yet? <a routerLink="/register">Create one</a>
     </p>
-  </div>
-</section>
+  </form>
+</app-auth-layout>

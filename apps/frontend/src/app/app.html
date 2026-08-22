@@ -1,11 +1,17 @@
-<app-header></app-header>
+<app-notifications />
 
-<app-notifications></app-notifications>
+@if (isAuthenticated()) {
+  <a class="skip-link" href="#main-content" (click)="skipToContent($event)">Skip to content</a>
 
-<main class="app-main">
-  <div class="content-container">
-    <router-outlet></router-outlet>
+  <div class="shell">
+    <app-sidebar />
+
+    <main id="main-content" class="shell-main" tabindex="-1">
+      <div class="shell-inner">
+        <router-outlet />
+      </div>
+    </main>
   </div>
-</main>
-
-<!-- footer removed as requested -->
+} @else {
+  <router-outlet />
+}

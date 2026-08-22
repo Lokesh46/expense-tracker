@@ -1,0 +1,182 @@
+<header class="page-head rise rise-1">
+  <div class="page-title">
+    <p class="eyebrow">Planning</p>
+    <h1>Budgets</h1>
+  </div>
+
+  <div class="row head-actions">
+    <div class="month-nav">
+      <button type="button" class="month-btn" (click)="shiftMonth(-1)" aria-label="Previous month">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+      </button>
+      <span class="month-label">{{ monthLabel() }}</span>
+      <button type="button" class="month-btn" (click)="shiftMonth(1)" aria-label="Next month">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
+      </button>
+    </div>
+
+    <button
+      type="button"
+      class="btn btn-primary btn-sm"
+      (click)="openCreate()"
+      [disabled]="availableCategories().length === 0"
+    >
+      Set a budget
+    </button>
+  </div>
+</header>
+
+@if (budgets().length > 0) {
+  <div class="summary rise rise-2">
+    <div class="summary-cell">
+      <p class="eyebrow">Allocated</p>
+      <p class="figure summary-value">{{ money(summary().allocated) }}</p>
+    </div>
+    <div class="summary-cell">
+      <p class="eyebrow">Spent</p>
+      <p class="figure summary-value">{{ money(summary().spent) }}</p>
+    </div>
+    <div class="summary-cell">
+      <p class="eyebrow">Over budget</p>
+      <p class="figure summary-value" [class.text-negative]="summary().overCount > 0">
+        {{ summary().overCount }} of {{ summary().count }}
+      </p>
+    </div>
+  </div>
+}
+
+@if (isLoading()) {
+  <div class="panel rise rise-3"><div class="empty"><p>Loading…</p></div></div>
+} @else if (budgets().length === 0) {
+  <div class="panel rise rise-3">
+    <div class="empty">
+      <h3>No budgets for {{ monthLabel() }}</h3>
+      <p>
+        Set a monthly cap on a category and this page tracks it against what you actually spend.
+        Limits carry across months — only the spending changes.
+      </p>
+      @if (availableCategories().length > 0) {
+        <button type="button" class="btn btn-primary btn-sm" (click)="openCreate()">
+          Set a budget
+        </button>
+      } @else {
+        <p class="text-tertiary">Create a category first.</p>
+      }
+    </div>
+  </div>
+} @else {
+  <ul class="budget-list rise rise-3">
+    @for (budget of budgets(); track budget.id) {
+      <li class="budget-card" [class.is-over]="budget.exceeded">
+        <div class="budget-head">
+          <span class="budget-name">
+            <span class="dot" [style.background]="categoryColor(budget.categoryId)"></span>
+            {{ budget.categoryName }}
+          </span>
+
+          <span class="budget-actions">
+            <button type="button" class="btn btn-ghost btn-sm" (click)="openEdit(budget)">
+              Edit
+            </button>
+            <button type="button" class="btn btn-danger btn-sm" (click)="pendingDelete.set(budget)">
+              Remove
+            </button>
+          </span>
+        </div>
+
+        <div class="budget-figures">
+          <span class="figure budget-spent">{{ money(budget.spent) }}</span>
+          <span class="text-tertiary budget-of">of {{ money(budget.monthlyLimit) }}</span>
+        </div>
+
+        <div
+          class="meter"
+          role="progressbar"
+          [attr.aria-valuenow]="budget.percentUsed"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          [attr.aria-label]="budget.categoryName"
+        >
+          <div
+            class="meter-fill"
+            [class]="meterState(budget)"
+            [style.width]="meterWidth(budget)"
+          ></div>
+        </div>
+
+        <div class="budget-foot">
+          <span class="figure budget-pct">{{ budget.percentUsed }}%</span>
+          <span [class.text-negative]="budget.exceeded" [class.text-positive]="!budget.exceeded">
+            {{ statusLabel(budget) }}
+          </span>
+        </div>
+      </li>
+    }
+  </ul>
+}
+
+@if (isFormOpen()) {
+  <app-modal
+    [heading]="editing() ? 'Edit budget' : 'Set a budget'"
+    description="The limit applies every month until you change it."
+    (closed)="isFormOpen.set(false)"
+  >
+    <form class="entry-form" [formGroup]="form" (ngSubmit)="save()" novalidate>
+      <div class="field">
+        <label for="categoryId">Category</label>
+        <select
+          id="categoryId"
+          class="select"
+          formControlName="categoryId"
+          [class.is-invalid]="invalid('categoryId')"
+        >
+          <option value="" disabled>Choose…</option>
+          @for (category of availableCategories(); track category.id) {
+            <option [value]="category.id">{{ category.name }}</option>
+          }
+        </select>
+        @if (invalid('categoryId')) {
+          <span class="field-error">Pick a category.</span>
+        }
+      </div>
+
+      <div class="field">
+        <label for="monthlyLimit">Monthly limit ({{ currency() }})</label>
+        <input
+          id="monthlyLimit"
+          class="input"
+          type="number"
+          min="0.01"
+          step="0.01"
+          formControlName="monthlyLimit"
+          [class.is-invalid]="invalid('monthlyLimit')"
+        />
+        @if (invalid('monthlyLimit')) {
+          <span class="field-error">Enter a limit above zero.</span>
+        }
+      </div>
+
+      <div class="form-actions">
+        <button type="button" class="btn" (click)="isFormOpen.set(false)">Cancel</button>
+        <button type="submit" class="btn btn-primary" [disabled]="isSaving()">
+          {{ isSaving() ? 'Saving…' : 'Save budget' }}
+        </button>
+      </div>
+    </form>
+  </app-modal>
+}
+
+@if (pendingDelete(); as target) {
+  <app-modal heading="Remove this budget?" (closed)="pendingDelete.set(null)">
+    <p class="confirm-text">
+      The cap on <strong>{{ target.categoryName }}</strong> will be removed. Your transactions are
+      not affected.
+    </p>
+    <div class="form-actions">
+      <button type="button" class="btn" (click)="pendingDelete.set(null)">Keep it</button>
+      <button type="button" class="btn btn-primary is-danger" (click)="confirmDelete()">
+        Remove
+      </button>
+    </div>
+  </app-modal>
+}

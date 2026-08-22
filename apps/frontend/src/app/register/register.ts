@@ -1,102 +1,83 @@
-import { Component, DestroyRef, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormBuilder, Validators, ReactiveFormsModule, ValidatorFn } from '@angular/forms';
+import { Component, inject, signal } from '@angular/core';
+import {
+  AbstractControl,
+  FormBuilder,
+  ReactiveFormsModule,
+  ValidationErrors,
+  Validators,
+} from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { AuthService } from '../core/services/auth.service';
+import { NotificationService } from '../core/services/notification.service';
+import { AuthLayoutComponent } from '../shared/auth-layout/auth-layout';
+import { describeError } from '../core/utils/api-error';
+
+/** Cross-field check; lives on the group because it compares two controls. */
+function passwordsMatch(group: AbstractControl): ValidationErrors | null {
+  const password = group.get('password')?.value;
+  const confirm = group.get('confirmPassword')?.value;
+  return !confirm || password === confirm ? null : { mismatch: true };
+}
 
 @Component({
   selector: 'app-register',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, AuthLayoutComponent],
   templateUrl: './register.html',
   styleUrl: './register.css',
 })
 export class Register {
-  private readonly fb = inject(FormBuilder);
-  private readonly authService = inject(AuthService);
+  private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
-  private readonly destroyRef = inject(DestroyRef);
+  private readonly notifications = inject(NotificationService);
+  private readonly fb = inject(FormBuilder);
 
   protected readonly isSubmitting = signal(false);
   protected readonly errorMessage = signal<string | null>(null);
-  protected readonly successMessage = signal<string | null>(null);
-  private readonly passwordsMatchValidator: ValidatorFn = (group) => {
-    const password = group.get('password')?.value;
-    const confirmPassword = group.get('confirmPassword')?.value;
-    return password && confirmPassword && password !== confirmPassword ? { mismatch: true } : null;
-  };
+  protected readonly showPassword = signal(false);
 
-  readonly registerForm = this.fb.nonNullable.group(
+  protected readonly form = this.fb.nonNullable.group(
     {
-      username: ['', [Validators.required]],
-      email: ['', [Validators.required, Validators.email]],
-      password: ['', [Validators.required, Validators.minLength(6)]],
+      username: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(30)]],
+      email: ['', [Validators.email]],
+      password: ['', [Validators.required, Validators.minLength(8)]],
       confirmPassword: ['', [Validators.required]],
     },
-    { validators: this.passwordsMatchValidator }
+    { validators: passwordsMatch }
   );
 
-  onSubmit(): void {
-    this.errorMessage.set(null);
-    this.successMessage.set(null);
-
-    if (this.registerForm.invalid) {
-      this.registerForm.markAllAsTouched();
-      if (this.registerForm.hasError('mismatch')) {
-        this.errorMessage.set('Passwords must match.');
-      }
+  protected submit(): void {
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
       return;
     }
 
-    const { username, password, email } = this.registerForm.getRawValue();
     this.isSubmitting.set(true);
+    this.errorMessage.set(null);
 
-    this.authService
-      .register({ username, password, email })
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: () => {
-          this.isSubmitting.set(false);
-          this.successMessage.set('Registration successful. Redirecting to login...');
-          setTimeout(() => this.router.navigate(['/login']), 1400);
-        },
-        error: (error) => {
-          this.isSubmitting.set(false);
-          this.errorMessage.set(
-            error?.error?.message ?? 'Could not register. Please try again later.'
-          );
-        },
-      });
+    const { username, email, password } = this.form.getRawValue();
+
+    this.auth.register({ username, password, email: email || undefined }).subscribe({
+      next: () => {
+        this.notifications.showSuccess('Account created. Sign in to get started.');
+        this.router.navigate(['/login']);
+      },
+      error: (err) => {
+        this.isSubmitting.set(false);
+        this.errorMessage.set(describeError(err, 'Could not create the account.'));
+      },
+    });
   }
 
-  showFieldError(controlName: 'username' | 'password' | 'confirmPassword'): string | null {
-    const control = this.registerForm.get(controlName);
-    if (!control) {
-      return null;
-    }
+  protected invalid(field: 'username' | 'email' | 'password' | 'confirmPassword'): boolean {
+    const control = this.form.controls[field];
+    return control.invalid && control.touched;
+  }
 
-    if (
-      controlName === 'confirmPassword' &&
-      (control.touched || control.dirty) &&
-      this.registerForm.hasError('mismatch')
-    ) {
-      return 'Passwords must match.';
-    }
-
-    if (!(control.invalid && (control.touched || control.dirty))) {
-      return null;
-    }
-
-    if (control.hasError('required')) {
-      return 'This field is required.';
-    }
-
-    if (controlName === 'password' && control.hasError('minlength')) {
-      return 'Password must include at least 6 characters.';
-    }
-
-    return null;
+  protected get mismatched(): boolean {
+    return (
+      this.form.hasError('mismatch') && (this.form.controls.confirmPassword.touched ?? false)
+    );
   }
 }

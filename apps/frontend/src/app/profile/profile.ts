@@ -1,61 +1,78 @@
-import { CommonModule } from '@angular/common';
-import { Component, inject, signal } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Component, computed, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
+
+import { AuthService } from '../core/services/auth.service';
+import { CategoryService } from '../core/services/category.service';
+import { NotificationService } from '../core/services/notification.service';
+import { RecurringService } from '../core/services/recurring.service';
+import { TransactionService } from '../core/services/transaction.service';
+import { ThemeService, Theme } from '../core/services/theme.service';
+import { describeError } from '../core/utils/api-error';
 
 @Component({
   selector: 'app-profile',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
   templateUrl: './profile.html',
   styleUrl: './profile.css',
 })
 export class Profile {
-  private readonly fb = inject(FormBuilder);
+  private readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
+  private readonly transactionService = inject(TransactionService);
+  private readonly recurringService = inject(RecurringService);
+  private readonly notifications = inject(NotificationService);
+  protected readonly categoryService = inject(CategoryService);
+  protected readonly themeService = inject(ThemeService);
 
-  protected readonly isSaving = signal(false);
-  protected readonly saveMessage = signal<string | null>(null);
+  protected readonly transactionCount = signal<number | null>(null);
+  protected readonly recurringCount = signal<number | null>(null);
 
-  readonly profileForm = this.fb.nonNullable.group({
-    fullName: ['Priya Sharma', [Validators.required, Validators.minLength(3)]],
-    email: ['priya.sharma@example.com', [Validators.required, Validators.email]],
-    currency: ['INR', [Validators.required]],
-    reminderDay: [5, [Validators.required, Validators.min(1), Validators.max(28)]],
-    notifications: this.fb.nonNullable.group({
-      email: [true],
-      push: [false],
-      monthlyDigest: [true],
-    }),
+  protected readonly username = this.auth.getUsername() ?? 'Unknown';
+  protected readonly initial = this.username.charAt(0).toUpperCase();
+
+  protected readonly expiry = computed(() => {
+    const date = this.auth.getExpiry();
+    return date
+      ? date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+      : 'Unknown';
   });
 
-  onSubmit(): void {
-    this.saveMessage.set(null);
-    if (this.profileForm.invalid) {
-      this.profileForm.markAllAsTouched();
-      return;
-    }
+  constructor() {
+    this.categoryService.load().subscribe();
 
-    this.isSaving.set(true);
+    // Only the totals are needed, so ask for the smallest page the API allows
+    // and read the count from the envelope rather than downloading the rows.
+    this.transactionService.search({ size: 1 }).subscribe({
+      next: (page) => this.transactionCount.set(page.totalElements),
+      error: (err) => this.notifications.showError(describeError(err, 'Could not load totals.')),
+    });
 
-    queueMicrotask(() => {
-      setTimeout(() => {
-        this.isSaving.set(false);
-        this.saveMessage.set('Profile preferences saved successfully.');
-      }, 600);
+    this.recurringService.load().subscribe({
+      next: (rules) => this.recurringCount.set(rules.length),
     });
   }
 
-  resetPreferences(): void {
-    this.profileForm.reset({
-      fullName: 'Priya Sharma',
-      email: 'priya.sharma@example.com',
-      currency: 'INR',
-      reminderDay: 5,
-      notifications: {
-        email: true,
-        push: false,
-        monthlyDigest: true,
+  protected setTheme(theme: Theme): void {
+    this.themeService.set(theme);
+  }
+
+  protected exportEverything(): void {
+    this.transactionService.exportCsv({}).subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `ledger-export-${new Date().toISOString().slice(0, 10)}.csv`;
+        link.click();
+        URL.revokeObjectURL(url);
+        this.notifications.showSuccess('Export downloaded.');
       },
+      error: (err) => this.notifications.showError(describeError(err, 'Could not export.')),
     });
-    this.saveMessage.set('Defaults restored.');
+  }
+
+  protected signOut(): void {
+    this.auth.logout();
+    this.router.navigate(['/login']);
   }
 }

@@ -1,16 +1,20 @@
-import { CanActivateFn } from '@angular/router';
 import { inject } from '@angular/core';
-import { Router } from '@angular/router';
+import { CanActivateFn, Router } from '@angular/router';
 
 import { AuthService } from '../services/auth.service';
 
-export const authGuard: CanActivateFn = (route, state) => {
+export const authGuard: CanActivateFn = (_route, state) => {
   const auth = inject(AuthService);
   const router = inject(Router);
 
-  const token = auth.getToken();
-  if (token) return true;
+  if (auth.getToken()) {
+    return true;
+  }
 
-  router.navigate(['/login']);
-  return false;
+  // Returning a UrlTree rather than navigating imperatively lets the router
+  // cancel this navigation cleanly, and remembering where the user was heading
+  // means a deep link still works after signing in.
+  return router.createUrlTree(['/login'], {
+    queryParams: state.url === '/dashboard' ? {} : { returnUrl: state.url },
+  });
 };

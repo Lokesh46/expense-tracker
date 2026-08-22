@@ -1,0 +1,70 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.lede {
+  max-width: 68ch;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.due-note {
+  margin-left: var(--space-1);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.desc {
+  display: block;
+  font-weight: 500;
+}
+
+.desc-note {
+  display: block;
+  margin-top: 1px;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+/* A paused rule is dimmed but stays legible — it is still a record the user
+   may want to read, not disabled UI. */
+.is-paused .desc,
+.is-paused .next-cell,
+.is-paused .num {
+  opacity: 0.55;
+}
+
+.tag {
+  display: inline-block;
+  margin-left: var(--space-2);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-full);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  vertical-align: 1px;
+}
+
+.next-cell {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* Something already owed is worth marking: the sweep may not have run yet. */
+.next-cell.is-due {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-1);
+  white-space: nowrap;
+}

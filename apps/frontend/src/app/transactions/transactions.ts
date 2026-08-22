@@ -1,318 +1,383 @@
-import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { TransactionService } from '../core/services/transaction.service';
+import { Component, computed, effect, inject, signal } from '@angular/core';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { debounceTime, distinctUntilChanged } from 'rxjs';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+
 import { CategoryService } from '../core/services/category.service';
 import { NotificationService } from '../core/services/notification.service';
-import { Transaction, CreateTransactionRequest } from '../core/models/transaction.models';
-import { Category } from '../core/models/category.models';
- 
+import { TransactionService } from '../core/services/transaction.service';
+import {
+  CURRENCIES,
+  PAYMENT_METHODS,
+  Transaction,
+  TransactionQuery,
+} from '../core/models/transaction.models';
+import { ModalComponent } from '../shared/modal/modal';
+import { describeError } from '../core/utils/api-error';
+import { formatMoney, totalsByCurrency } from '../core/utils/money';
+
+type SortKey = 'date' | 'amount' | 'description';
 
 @Component({
   selector: 'app-transactions',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [ReactiveFormsModule, ModalComponent],
   templateUrl: './transactions.html',
   styleUrl: './transactions.css',
 })
-export class TransactionsComponent implements OnInit {
+export class TransactionsComponent {
   private readonly transactionService = inject(TransactionService);
   private readonly categoryService = inject(CategoryService);
-  private readonly notificationService = inject(NotificationService);
+  private readonly notifications = inject(NotificationService);
   private readonly fb = inject(FormBuilder);
 
-  transactions = signal<Transaction[]>([]);
-  // sort options: newest (default), oldest, amount_desc, amount_asc
-  sortBy = signal<'newest' | 'oldest' | 'amount_desc' | 'amount_asc'>('newest');
-  categories = signal<Category[]>([]);
-  isLoading = signal(false);
-  isCategoriesLoading = signal(false);
-  isFormLoading = signal(false);
-  showCreateForm = signal(false);
-  editingTransactionId = signal<number | null>(null);
-  transactionForm: FormGroup;
-  filterForm: FormGroup;
+  protected readonly paymentMethods = PAYMENT_METHODS;
+  protected readonly currencies = CURRENCIES;
+  protected readonly categories = this.categoryService.categories;
+  protected readonly colorById = this.categoryService.colorById;
 
-  // Pagination
-  currentPage = signal(1);
-  itemsPerPage = signal(10);
+  // --- results ---
+  protected readonly rows = signal<Transaction[]>([]);
+  protected readonly totalElements = signal(0);
+  protected readonly totalPages = signal(0);
+  protected readonly page = signal(0);
+  protected readonly size = signal(20);
+  protected readonly isLoading = signal(false);
+
+  // --- sorting ---
+  protected readonly sortBy = signal<SortKey>('date');
+  protected readonly sortDir = signal<'asc' | 'desc'>('desc');
+
+  // --- editing ---
+  protected readonly isFormOpen = signal(false);
+  protected readonly editingId = signal<number | null>(null);
+  protected readonly isSaving = signal(false);
+  protected readonly pendingDelete = signal<Transaction | null>(null);
+
+  // --- import ---
+  protected readonly isImportOpen = signal(false);
+  protected readonly importErrors = signal<string[]>([]);
+  protected readonly isImporting = signal(false);
+
+  protected readonly filters = this.fb.nonNullable.group({
+    search: [''],
+    categoryId: [''],
+    from: [''],
+    to: [''],
+    minAmount: [''],
+    maxAmount: [''],
+    paymentMethod: [''],
+  });
+
+  protected readonly form = this.fb.nonNullable.group({
+    description: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(200)]],
+    amount: ['', [Validators.required, Validators.min(0.01)]],
+    currency: ['GBP', [Validators.required]],
+    categoryId: ['', [Validators.required]],
+    date: [new Date().toISOString().slice(0, 10), [Validators.required]],
+    paymentMethod: ['Card', [Validators.required]],
+    comments: ['', [Validators.maxLength(500)]],
+  });
+
+  /**
+   * Page totals, split by currency.
+   *
+   * Amounts in different currencies are never added together: a single number
+   * mixing GBP and INR would be meaningless.
+   */
+  protected readonly pageTotals = computed(() => totalsByCurrency(this.rows()));
+
+  protected readonly hasFilters = computed(() => {
+    const value = this.filters.getRawValue();
+    return Object.values(value).some((v) => v !== '' && v !== null);
+  });
+
+  protected readonly rangeLabel = computed(() => {
+    const total = this.totalElements();
+    if (total === 0) {
+      return 'No entries';
+    }
+    const start = this.page() * this.size() + 1;
+    const end = Math.min(start + this.rows().length - 1, total);
+    return `${start}–${end} of ${total}`;
+  });
 
   constructor() {
-    this.transactionForm = this.fb.group({
-      amount: ['', [Validators.required, Validators.min(0.01)]],
-      categoryId: ['', Validators.required],
-      description: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(200)]],
-      currency: ['USD', Validators.required],
-      date: ['', Validators.required],
-      paymentMethod: ['', Validators.required],
-      comments: ['', Validators.maxLength(500)],
-    });
-    this.filterForm = this.fb.group({
-      categoryId: [''],
-      fromDate: [''],
-      toDate: [''],
-      minAmount: [''],
-      maxAmount: [''],
-      paymentMethod: [''],
-      search: [''],
+    this.categoryService.load().subscribe({
+      error: (err) => this.notifications.showError(describeError(err, 'Could not load categories.')),
     });
 
-  }
+    // Typing in the filter bar re-queries the server, so wait for a pause and
+    // ignore repeats — otherwise every keystroke is a round trip.
+    this.filters.valueChanges
+      .pipe(debounceTime(300), distinctUntilChanged(deepEqual), takeUntilDestroyed())
+      .subscribe(() => {
+        this.page.set(0);
+        this.load();
+      });
 
-  ngOnInit(): void {
-    this.loadCategories();
-    this.loadTransactions();
-    // subscribe to service stream so the list updates live (create/update/delete)
-    this.transactionService.transactions$.subscribe((t) => {
-      if (t) this.transactions.set(t);
+    // Re-run whenever paging or sorting changes.
+    effect(() => {
+      this.page();
+      this.size();
+      this.sortBy();
+      this.sortDir();
+      this.load();
     });
   }
 
-  loadCategories(): void {
-    this.isCategoriesLoading.set(true);
-    this.categoryService.getCategories().subscribe({
-      next: (categories) => {
-        this.categories.set(categories);
-        this.isCategoriesLoading.set(false);
-      },
-      error: (err) => {
-        console.error('Failed to load categories', err);
-        this.notificationService.showError('Failed to load categories');
-        this.isCategoriesLoading.set(false);
-      },
-    });
-  }
+  // ------------------------------------------------------------------ loading
 
-  loadTransactions(): void {
+  protected load(): void {
     this.isLoading.set(true);
-    this.transactionService.getTransactions().subscribe({
-      next: (transactions) => {
-        this.transactions.set(transactions);
+
+    this.transactionService.search(this.currentQuery()).subscribe({
+      next: (result) => {
+        this.rows.set(result.content);
+        this.totalElements.set(result.totalElements);
+        this.totalPages.set(result.totalPages);
         this.isLoading.set(false);
       },
       error: (err) => {
-        console.error('Failed to load transactions', err);
-        this.notificationService.showError('Failed to load transactions');
         this.isLoading.set(false);
+        this.notifications.showError(describeError(err, 'Could not load transactions.'));
       },
     });
   }
 
-  // Filter helpers
-  onFilterApply(): void {
-    this.currentPage.set(1);
-  }
-
-  onFilterClear(): void {
-    this.filterForm.reset({ categoryId: '', fromDate: '', toDate: '', minAmount: '', maxAmount: '', paymentMethod: '', search: '' });
-    this.currentPage.set(1);
-  }
-
-  onCreateSubmit(): void {
-    if (this.transactionForm.invalid) {
-      this.notificationService.showWarning('Please fill in all required fields');
-      return;
-    }
-
-    this.isFormLoading.set(true);
-    const formValue = this.transactionForm.value;
-    const payload: CreateTransactionRequest = {
-      ...formValue,
-      amount: Number.parseFloat(formValue.amount),
-      categoryId: Number(formValue.categoryId),
+  private currentQuery(): TransactionQuery {
+    const f = this.filters.getRawValue();
+    return {
+      page: this.page(),
+      size: this.size(),
+      sortBy: this.sortBy(),
+      sortDir: this.sortDir(),
+      search: f.search || null,
+      categoryId: f.categoryId ? Number(f.categoryId) : null,
+      from: f.from || null,
+      to: f.to || null,
+      minAmount: f.minAmount ? Number(f.minAmount) : null,
+      maxAmount: f.maxAmount ? Number(f.maxAmount) : null,
+      paymentMethod: f.paymentMethod || null,
     };
-
-    this.transactionService.createTransaction(payload).subscribe({
-      next: () => {
-        this.notificationService.showSuccess('Transaction created successfully');
-        this.transactionForm.reset();
-        this.transactionForm.patchValue({ currency: 'USD' });
-        this.showCreateForm.set(false);
-        this.isFormLoading.set(false);
-        // show the newest transactions (newly created should appear first)
-        this.sortBy.set('newest');
-        this.currentPage.set(1);
-      },
-      error: (err) => {
-        console.error('Failed to create transaction', err);
-        this.notificationService.showError('Failed to create transaction');
-        this.isFormLoading.set(false);
-      },
-    });
   }
 
-  onSortChange(value: string): void {
-    if (value === 'newest' || value === 'oldest' || value === 'amount_desc' || value === 'amount_asc') {
-      this.sortBy.set(value as any);
-      this.currentPage.set(1);
+  // ----------------------------------------------------------------- sorting
+
+  protected toggleSort(key: SortKey): void {
+    if (this.sortBy() === key) {
+      this.sortDir.set(this.sortDir() === 'asc' ? 'desc' : 'asc');
+    } else {
+      this.sortBy.set(key);
+      this.sortDir.set(key === 'description' ? 'asc' : 'desc');
+    }
+    this.page.set(0);
+  }
+
+  protected sortIndicator(key: SortKey): string {
+    if (this.sortBy() !== key) {
+      return '';
+    }
+    return this.sortDir() === 'asc' ? '↑' : '↓';
+  }
+
+  // ----------------------------------------------------------------- paging
+
+  protected goToPage(page: number): void {
+    if (page >= 0 && page < this.totalPages()) {
+      this.page.set(page);
     }
   }
 
-  onEditClick(transaction: Transaction): void {
-    this.editingTransactionId.set(transaction.id);
-    this.transactionForm.patchValue({
-      amount: transaction.amount,
-      categoryId: transaction.categoryId,
+  protected changeSize(value: string): void {
+    this.size.set(Number(value));
+    this.page.set(0);
+  }
+
+  protected clearFilters(): void {
+    this.filters.reset({
+      search: '',
+      categoryId: '',
+      from: '',
+      to: '',
+      minAmount: '',
+      maxAmount: '',
+      paymentMethod: '',
+    });
+  }
+
+  // ------------------------------------------------------------------ create
+
+  protected openCreate(): void {
+    this.editingId.set(null);
+    this.form.reset({
+      description: '',
+      amount: '',
+      currency: this.rows()[0]?.currency ?? 'GBP',
+      categoryId: String(this.categories()[0]?.id ?? ''),
+      date: new Date().toISOString().slice(0, 10),
+      paymentMethod: 'Card',
+      comments: '',
+    });
+    this.isFormOpen.set(true);
+  }
+
+  protected openEdit(transaction: Transaction): void {
+    this.editingId.set(transaction.id);
+    this.form.reset({
       description: transaction.description,
+      amount: String(transaction.amount),
       currency: transaction.currency,
+      categoryId: String(transaction.categoryId),
       date: transaction.date,
       paymentMethod: transaction.paymentMethod,
-      comments: transaction.comments || '',
+      comments: transaction.comments ?? '',
     });
-    this.showCreateForm.set(true);
+    this.isFormOpen.set(true);
   }
 
-  onUpdateSubmit(): void {
-    const transactionId = this.editingTransactionId();
-    if (!transactionId || this.transactionForm.invalid) {
-      this.notificationService.showWarning('Please fill in all required fields');
+  protected save(): void {
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
       return;
     }
 
-    this.isFormLoading.set(true);
-    const formValue = this.transactionForm.value;
+    const value = this.form.getRawValue();
     const payload = {
-      ...formValue,
-      amount: Number.parseFloat(formValue.amount),
-      categoryId: Number(formValue.categoryId),
+      description: value.description.trim(),
+      amount: Number(value.amount),
+      currency: value.currency,
+      categoryId: Number(value.categoryId),
+      date: value.date,
+      paymentMethod: value.paymentMethod,
+      comments: value.comments?.trim() || undefined,
     };
 
-    this.transactionService.updateTransaction(transactionId, payload).subscribe({
+    this.isSaving.set(true);
+    const id = this.editingId();
+    const request = id
+      ? this.transactionService.update(id, payload)
+      : this.transactionService.create(payload);
+
+    request.subscribe({
       next: () => {
-        this.notificationService.showSuccess('Transaction updated successfully');
-        this.transactionForm.reset();
-        this.showCreateForm.set(false);
-        this.editingTransactionId.set(null);
-        this.isFormLoading.set(false);
+        this.isSaving.set(false);
+        this.isFormOpen.set(false);
+        this.notifications.showSuccess(id ? 'Transaction updated.' : 'Transaction recorded.');
+        this.load();
       },
       error: (err) => {
-        console.error('Failed to update transaction', err);
-        this.notificationService.showError('Failed to update transaction');
-        this.isFormLoading.set(false);
+        this.isSaving.set(false);
+        this.notifications.showError(describeError(err, 'Could not save the transaction.'));
       },
     });
   }
 
-  onDeleteClick(id: number): void {
-    if (confirm('Are you sure you want to delete this transaction?')) {
-      this.transactionService.deleteTransaction(id).subscribe({
-        next: () => {
-          this.notificationService.showSuccess('Transaction deleted successfully');
-        },
-        error: (err) => {
-          console.error('Failed to delete transaction', err);
-          this.notificationService.showError('Failed to delete transaction');
-        },
-      });
+  // ------------------------------------------------------------------ delete
+
+  protected confirmDelete(): void {
+    const target = this.pendingDelete();
+    if (!target) {
+      return;
     }
-  }
 
-  onCancel(): void {
-    this.transactionForm.reset();
-    this.transactionForm.patchValue({ currency: 'USD' });
-    this.showCreateForm.set(false);
-    this.editingTransactionId.set(null);
-  }
+    this.transactionService.delete(target.id).subscribe({
+      next: () => {
+        this.pendingDelete.set(null);
+        this.notifications.showSuccess('Transaction deleted.');
 
-  getCategoryName(categoryId: number): string {
-    const category = this.categories().find((c) => c.id === categoryId);
-    return category?.name || 'Unknown';
-  }
-
-  get isEditMode(): boolean {
-    return this.editingTransactionId() !== null;
-  }
-
-  get filteredTransactions(): Transaction[] {
-    const all = this.transactions();
-    const f = this.filterForm.value;
-
-    const filtered = all.filter((t) => {
-      // Category filter
-      if (f.categoryId && f.categoryId !== '' && t.categoryId !== Number(f.categoryId)) return false;
-
-      // Payment method
-      if (f.paymentMethod && f.paymentMethod !== '' && t.paymentMethod !== f.paymentMethod) return false;
-
-      // Description search
-      if (f.search && f.search.trim() !== '') {
-        const q = f.search.trim().toLowerCase();
-        if (!t.description.toLowerCase().includes(q) && !(t.comments || '').toLowerCase().includes(q)) return false;
-      }
-
-      // Amount range
-      if (f.minAmount !== null && f.minAmount !== '' && !Number.isNaN(Number.parseFloat(f.minAmount))) {
-        if (t.amount < Number.parseFloat(f.minAmount)) return false;
-      }
-      if (f.maxAmount !== null && f.maxAmount !== '' && !Number.isNaN(Number.parseFloat(f.maxAmount))) {
-        if (t.amount > Number.parseFloat(f.maxAmount)) return false;
-      }
-
-      // Date range
-      if (f.fromDate) {
-        const from = new Date(f.fromDate);
-        const td = new Date(t.date);
-        if (td < from) return false;
-      }
-      if (f.toDate) {
-        const to = new Date(f.toDate);
-        const td = new Date(t.date);
-        // include whole day
-        to.setHours(23, 59, 59, 999);
-        if (td > to) return false;
-      }
-
-      return true;
+        // Deleting the only row on the last page would otherwise leave the user
+        // staring at an empty table.
+        if (this.rows().length === 1 && this.page() > 0) {
+          this.page.set(this.page() - 1);
+        } else {
+          this.load();
+        }
+      },
+      error: (err) => {
+        this.pendingDelete.set(null);
+        this.notifications.showError(describeError(err, 'Could not delete the transaction.'));
+      },
     });
+  }
 
-    // Apply sorting
-    const sort = this.sortBy();
-    filtered.sort((a, b) => {
-      if (sort === 'newest') {
-        return +new Date(b.date) - +new Date(a.date);
-      }
-      if (sort === 'oldest') {
-        return +new Date(a.date) - +new Date(b.date);
-      }
-      if (sort === 'amount_desc') {
-        return (b.amount || 0) - (a.amount || 0);
-      }
-      if (sort === 'amount_asc') {
-        return (a.amount || 0) - (b.amount || 0);
-      }
-      return 0;
+  // ------------------------------------------------------------------ csv
+
+  protected exportCsv(): void {
+    this.transactionService.exportCsv(this.currentQuery()).subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `transactions-${new Date().toISOString().slice(0, 10)}.csv`;
+        link.click();
+        URL.revokeObjectURL(url);
+        this.notifications.showSuccess('Export downloaded.');
+      },
+      error: (err) => this.notifications.showError(describeError(err, 'Could not export.')),
     });
-
-    return filtered;
   }
 
-
-  get paginatedTransactions(): Transaction[] {
-    const items = this.filteredTransactions;
-    const startIndex = (this.currentPage() - 1) * this.itemsPerPage();
-    const endIndex = startIndex + this.itemsPerPage();
-    return items.slice(startIndex, endIndex);
-  }
-
-  get totalPages(): number {
-    return Math.ceil(this.filteredTransactions.length / this.itemsPerPage());
-  }
-
-  goToPage(page: number): void {
-    if (page > 0 && page <= this.totalPages) {
-      this.currentPage.set(page);
+  protected onFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) {
+      return;
     }
+
+    this.isImporting.set(true);
+    this.importErrors.set([]);
+
+    this.transactionService.importCsv(file).subscribe({
+      next: (result) => {
+        this.isImporting.set(false);
+        this.importErrors.set(result.errors);
+
+        if (result.imported > 0) {
+          this.notifications.showSuccess(
+            `Imported ${result.imported} transaction${result.imported === 1 ? '' : 's'}.`
+          );
+          this.categoryService.load().subscribe();
+          this.load();
+        }
+        if (result.skipped > 0 && result.imported === 0) {
+          this.notifications.showWarning('Nothing could be imported from that file.');
+        }
+        if (result.errors.length === 0) {
+          this.isImportOpen.set(false);
+        }
+        // Allow the same file to be chosen again after a fix.
+        input.value = '';
+      },
+      error: (err) => {
+        this.isImporting.set(false);
+        input.value = '';
+        this.notifications.showError(describeError(err, 'Could not read that file.'));
+      },
+    });
   }
 
-  nextPage(): void {
-    if (this.currentPage() < this.totalPages) {
-      this.currentPage.set(this.currentPage() + 1);
-    }
+  // ------------------------------------------------------------------ display
+
+  protected money(transaction: Transaction): string {
+    return formatMoney(transaction.amount, transaction.currency);
   }
 
-  previousPage(): void {
-    if (this.currentPage() > 1) {
-      this.currentPage.set(this.currentPage() - 1);
-    }
+  protected formatTotal(total: { currency: string; total: number }): string {
+    return formatMoney(total.total, total.currency);
   }
+
+  protected categoryColor(id: number): string {
+    return this.colorById().get(id) ?? 'var(--accent)';
+  }
+
+  protected invalid(field: keyof typeof this.form.controls): boolean {
+    const control = this.form.controls[field];
+    return control.invalid && control.touched;
+  }
+}
+
+/** Value comparison for the filter form, which only ever holds primitives. */
+function deepEqual(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
 }

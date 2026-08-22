@@ -1,0 +1,227 @@
+.auth {
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  min-height: 100vh;
+  position: relative;
+  z-index: 1;
+}
+
+/* --------------------------------------------------------------------------
+   Editorial side
+   -------------------------------------------------------------------------- */
+
+.auth-aside {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-7);
+  padding: var(--space-7) var(--space-7) var(--space-6);
+  background: var(--surface-sunken);
+  border-right: 1px solid var(--rule);
+  position: relative;
+  overflow: hidden;
+}
+
+/* A wash of brass bled in from the top-left corner. Subtle enough to read as
+   paper tone rather than as a gradient effect. */
+.auth-aside::before {
+  content: '';
+  position: absolute;
+  top: -30%;
+  left: -20%;
+  width: 75%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--accent-muted), transparent 68%);
+  pointer-events: none;
+}
+
+.auth-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  font-variation-settings: 'SOFT' 0, 'WONK' 1, 'opsz' 24;
+  position: relative;
+}
+
+.auth-mark {
+  width: 22px;
+  height: 22px;
+  fill: var(--accent);
+}
+
+.auth-statement {
+  margin-top: auto;
+  position: relative;
+}
+
+.auth-quote {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 4.2vw, var(--text-4xl));
+  font-weight: 500;
+  line-height: 1.06;
+  letter-spacing: -0.03em;
+  font-variation-settings: 'SOFT' 0, 'WONK' 1, 'opsz' 144;
+  text-wrap: balance;
+}
+
+.auth-quote em {
+  font-style: italic;
+  color: var(--accent);
+  font-variation-settings: 'SOFT' 100, 'WONK' 1, 'opsz' 144;
+}
+
+.auth-sub {
+  margin-top: var(--space-4);
+  max-width: 42ch;
+  color: var(--text-secondary);
+  font-size: var(--text-base);
+}
+
+.auth-lines {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-4) 0 0;
+  border-top: 1px solid var(--rule);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.auth-lines li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-2) 0;
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  border-bottom: 1px solid var(--rule);
+}
+
+/* Leader dots between label and figure, the way a printed statement sets them. */
+.auth-lines li > span:first-child {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+}
+
+.auth-lines li > span:first-child::after {
+  content: '';
+  position: absolute;
+  bottom: 0.28em;
+  margin-left: var(--space-2);
+  width: 100%;
+  border-bottom: 1px dotted var(--rule-strong);
+}
+
+.auth-lines .is-total {
+  color: var(--text-primary);
+  font-weight: 600;
+  border-bottom: none;
+  border-top: 1px solid var(--rule-strong);
+  margin-top: var(--space-1);
+  padding-top: var(--space-3);
+}
+
+.auth-lines .is-total .figure {
+  color: var(--accent);
+}
+
+/* --------------------------------------------------------------------------
+   Form side
+   -------------------------------------------------------------------------- */
+
+.auth-main {
+  display: grid;
+  place-items: center;
+  padding: var(--space-6) var(--space-5);
+  position: relative;
+}
+
+.auth-panel {
+  width: min(400px, 100%);
+}
+
+.auth-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-6);
+}
+
+.auth-head h1 {
+  font-size: var(--text-2xl);
+}
+
+.auth-blurb {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.auth-theme {
+  position: absolute;
+  top: var(--space-5);
+  right: var(--space-5);
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.16s var(--ease-out), border-color 0.16s var(--ease-out);
+}
+
+.auth-theme:hover {
+  color: var(--accent);
+  border-color: var(--rule-accent);
+}
+
+.auth-theme svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* --------------------------------------------------------------------------
+   Narrow screens: the editorial panel collapses to a masthead.
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 900px) {
+  .auth {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .auth-aside {
+    gap: var(--space-5);
+    padding: var(--space-5) var(--space-5) var(--space-6);
+    border-right: none;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .auth-lines {
+    display: none;
+  }
+
+  .auth-statement {
+    margin-top: 0;
+  }
+
+  .auth-quote {
+    font-size: clamp(1.75rem, 7vw, 2.5rem);
+  }
+
+  .auth-main {
+    padding: var(--space-6) var(--space-4) var(--space-8);
+  }
+}

@@ -1,0 +1,224 @@
+<header class="page-head rise rise-1">
+  <div class="page-title">
+    <p class="eyebrow">Automation</p>
+    <h1>Recurring</h1>
+  </div>
+
+  <div class="row head-actions">
+    <button type="button" class="btn btn-sm" (click)="runNow()" [disabled]="isRunning()">
+      {{ isRunning() ? 'Running…' : 'Run due now' }}
+    </button>
+    <button type="button" class="btn btn-primary btn-sm" (click)="openCreate()">Add rule</button>
+  </div>
+</header>
+
+<p class="lede rise rise-2">
+  Rent, subscriptions, standing orders — anything that repeats. Rules run automatically overnight
+  and also catch up whenever you open your ledger, so a missed night never loses an entry.
+  @if (dueCount() > 0) {
+    <strong class="due-note">{{ dueCount() }} rule{{ dueCount() === 1 ? ' is' : 's are' }} due.</strong>
+  }
+</p>
+
+@if (isLoading()) {
+  <div class="panel rise rise-3"><div class="empty"><p>Loading…</p></div></div>
+} @else if (rules().length === 0) {
+  <div class="panel rise rise-3">
+    <div class="empty">
+      <h3>No recurring rules</h3>
+      <p>
+        Add one for a cost that repeats on a schedule and it will be entered for you from the
+        start date onwards.
+      </p>
+      <button type="button" class="btn btn-primary btn-sm" (click)="openCreate()">Add rule</button>
+    </div>
+  </div>
+} @else {
+  <div class="panel rise rise-3">
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Description</th>
+            <th>Category</th>
+            <th class="hide-sm">Frequency</th>
+            <th>Next</th>
+            <th class="num">Amount</th>
+            <th><span class="sr-only">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (rule of rules(); track rule.id) {
+            <tr [class.is-paused]="!rule.active">
+              <td>
+                <span class="desc">{{ rule.description }}</span>
+                @if (!rule.active) {
+                  <span class="tag">Paused</span>
+                }
+                @if (rule.endDate) {
+                  <span class="desc-note">Ends {{ rule.endDate }}</span>
+                }
+              </td>
+              <td>
+                <span class="chip">
+                  <span class="dot" [style.background]="categoryColor(rule.categoryId)"></span>
+                  {{ rule.categoryName }}
+                </span>
+              </td>
+              <td class="hide-sm text-secondary">{{ frequencyLabel(rule.frequency) }}</td>
+              <td class="figure next-cell" [class.is-due]="isDue(rule)">
+                {{ rule.nextRunDate }}
+              </td>
+              <td class="num">{{ money(rule) }}</td>
+              <td class="actions">
+                <button type="button" class="btn btn-ghost btn-sm" (click)="togglePaused(rule)">
+                  {{ rule.active ? 'Pause' : 'Resume' }}
+                </button>
+                <button type="button" class="btn btn-ghost btn-sm" (click)="openEdit(rule)">
+                  Edit
+                </button>
+                <button type="button" class="btn btn-danger btn-sm" (click)="pendingDelete.set(rule)">
+                  Delete
+                </button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+}
+
+@if (isFormOpen()) {
+  <app-modal
+    [heading]="editingId() ? 'Edit rule' : 'New recurring rule'"
+    description="Transactions are generated from the start date onwards, including any already in the past."
+    (closed)="isFormOpen.set(false)"
+  >
+    <form class="entry-form" [formGroup]="form" (ngSubmit)="save()" novalidate>
+      <div class="field">
+        <label for="description">Description</label>
+        <input
+          id="description"
+          class="input"
+          type="text"
+          formControlName="description"
+          placeholder="Rent, Netflix, gym…"
+          [class.is-invalid]="invalid('description')"
+        />
+        @if (invalid('description')) {
+          <span class="field-error">Give it a short description.</span>
+        }
+      </div>
+
+      <div class="pair">
+        <div class="field">
+          <label for="amount">Amount</label>
+          <input
+            id="amount"
+            class="input"
+            type="number"
+            min="0.01"
+            step="0.01"
+            formControlName="amount"
+            [class.is-invalid]="invalid('amount')"
+          />
+          @if (invalid('amount')) {
+            <span class="field-error">Enter an amount above zero.</span>
+          }
+        </div>
+
+        <div class="field">
+          <label for="currency">Currency</label>
+          <select id="currency" class="select" formControlName="currency">
+            @for (code of currencies; track code) {
+              <option [value]="code">{{ code }}</option>
+            }
+          </select>
+        </div>
+      </div>
+
+      <div class="pair">
+        <div class="field">
+          <label for="categoryId">Category</label>
+          <select
+            id="categoryId"
+            class="select"
+            formControlName="categoryId"
+            [class.is-invalid]="invalid('categoryId')"
+          >
+            <option value="" disabled>Choose…</option>
+            @for (category of categories(); track category.id) {
+              <option [value]="category.id">{{ category.name }}</option>
+            }
+          </select>
+          @if (invalid('categoryId')) {
+            <span class="field-error">Pick a category.</span>
+          }
+        </div>
+
+        <div class="field">
+          <label for="frequency">Repeats</label>
+          <select id="frequency" class="select" formControlName="frequency">
+            @for (option of frequencies; track option.value) {
+              <option [value]="option.value">{{ option.label }}</option>
+            }
+          </select>
+        </div>
+      </div>
+
+      <div class="pair">
+        <div class="field">
+          <label for="nextRunDate">Starting</label>
+          <input id="nextRunDate" class="input" type="date" formControlName="nextRunDate" />
+        </div>
+
+        <div class="field">
+          <label for="endDate">Until <span class="text-tertiary">(optional)</span></label>
+          <input id="endDate" class="input" type="date" formControlName="endDate" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="paymentMethod">Payment method</label>
+        <select id="paymentMethod" class="select" formControlName="paymentMethod">
+          @for (method of paymentMethods; track method) {
+            <option [value]="method">{{ method }}</option>
+          }
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="comments">Notes <span class="text-tertiary">(optional)</span></label>
+        <textarea id="comments" class="textarea" formControlName="comments"></textarea>
+      </div>
+
+      <label class="remember">
+        <input type="checkbox" formControlName="active" />
+        <span>Active — generate transactions on schedule</span>
+      </label>
+
+      <div class="form-actions">
+        <button type="button" class="btn" (click)="isFormOpen.set(false)">Cancel</button>
+        <button type="submit" class="btn btn-primary" [disabled]="isSaving()">
+          {{ isSaving() ? 'Saving…' : 'Save rule' }}
+        </button>
+      </div>
+    </form>
+  </app-modal>
+}
+
+@if (pendingDelete(); as target) {
+  <app-modal heading="Delete this rule?" (closed)="pendingDelete.set(null)">
+    <p class="confirm-text">
+      <strong>{{ target.description }}</strong> will stop generating transactions. Entries it has
+      already created are kept.
+    </p>
+    <div class="form-actions">
+      <button type="button" class="btn" (click)="pendingDelete.set(null)">Keep it</button>
+      <button type="button" class="btn btn-primary is-danger" (click)="confirmDelete()">
+        Delete
+      </button>
+    </div>
+  </app-modal>
+}

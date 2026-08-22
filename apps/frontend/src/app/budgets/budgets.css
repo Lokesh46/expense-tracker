@@ -1,0 +1,180 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* ---------------------------------------------------------------- month nav */
+
+.month-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+}
+
+.month-btn {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    color 0.16s var(--ease-out),
+    background-color 0.16s var(--ease-out);
+}
+
+.month-btn:hover {
+  color: var(--accent);
+  background: var(--surface-hover);
+}
+
+.month-btn svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Fixed width so the arrows do not shift as the month name changes length. */
+.month-label {
+  min-width: 11ch;
+  text-align: center;
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+/* ------------------------------------------------------------------ summary */
+
+.summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.summary-cell {
+  padding: var(--space-4) var(--space-5);
+  border-right: 1px solid var(--rule);
+}
+
+.summary-cell:last-child {
+  border-right: none;
+}
+
+.summary-value {
+  margin-top: var(--space-1);
+  font-size: var(--text-xl);
+  font-weight: 500;
+}
+
+/* ------------------------------------------------------------------ budgets */
+
+.budget-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+
+.budget-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-lg);
+  transition: border-color 0.16s var(--ease-out);
+}
+
+.budget-card:hover {
+  border-color: var(--rule-strong);
+}
+
+/* Overspend is signalled on the card edge as well as in the meter, so it reads
+   at a glance without parsing any numbers. */
+.budget-card.is-over {
+  border-color: color-mix(in srgb, var(--negative) 45%, transparent);
+}
+
+.budget-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.budget-name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.budget-actions {
+  display: flex;
+  gap: var(--space-1);
+  opacity: 0;
+  transition: opacity 0.16s var(--ease-out);
+}
+
+.budget-card:hover .budget-actions,
+.budget-card:focus-within .budget-actions {
+  opacity: 1;
+}
+
+/* Hover reveals nothing on touch, so keep the actions visible there. */
+@media (hover: none) {
+  .budget-actions {
+    opacity: 1;
+  }
+}
+
+.budget-figures {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.budget-spent {
+  font-size: var(--text-2xl);
+  font-weight: 500;
+  line-height: 1;
+}
+
+.budget-of {
+  font-size: var(--text-sm);
+}
+
+.budget-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.budget-pct {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}

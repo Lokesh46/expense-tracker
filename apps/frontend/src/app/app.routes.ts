@@ -1,21 +1,66 @@
 import { Routes } from '@angular/router';
-import { Login } from './login/login';
-import { Register } from './register/register';
-import { Home } from './home/home';
-import { Profile } from './profile/profile';
-import { CategoriesComponent } from './categories/categories';
-import { TransactionsComponent } from './transactions/transactions';
-import { DashboardComponent } from './dashboard/dashboard';
-import { authGuard } from './core/guards/auth.guard';
 
+import { authGuard } from './core/guards/auth.guard';
+import { guestGuard } from './core/guards/guest.guard';
+
+/**
+ * Every screen is loaded lazily. Chart.js alone is a large dependency and only
+ * the overview needs it, so keeping it out of the initial bundle materially
+ * shortens time-to-interactive on the sign-in screen.
+ */
 export const routes: Routes = [
-  { path: '', redirectTo: 'login', pathMatch: 'full' },
-  { path: 'login', component: Login },
-  { path: 'home', component: Home, canActivate: [authGuard] },
-  { path: 'profile', component: Profile, canActivate: [authGuard] },
-  { path: 'dashboard', component: DashboardComponent, canActivate: [authGuard] },
-  { path: 'register', component: Register },
-  { path: 'categories', component: CategoriesComponent, canActivate: [authGuard] },
-  { path: 'transactions', component: TransactionsComponent, canActivate: [authGuard] },
-  { path: '**', redirectTo: 'login' },
+  { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
+
+  {
+    path: 'login',
+    canActivate: [guestGuard],
+    loadComponent: () => import('./login/login').then((m) => m.Login),
+    title: 'Sign in · Ledger',
+  },
+  {
+    path: 'register',
+    canActivate: [guestGuard],
+    loadComponent: () => import('./register/register').then((m) => m.Register),
+    title: 'Create account · Ledger',
+  },
+
+  {
+    path: 'dashboard',
+    canActivate: [authGuard],
+    loadComponent: () => import('./dashboard/dashboard').then((m) => m.DashboardComponent),
+    title: 'Overview · Ledger',
+  },
+  {
+    path: 'transactions',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./transactions/transactions').then((m) => m.TransactionsComponent),
+    title: 'Ledger · Ledger',
+  },
+  {
+    path: 'budgets',
+    canActivate: [authGuard],
+    loadComponent: () => import('./budgets/budgets').then((m) => m.BudgetsComponent),
+    title: 'Budgets · Ledger',
+  },
+  {
+    path: 'categories',
+    canActivate: [authGuard],
+    loadComponent: () => import('./categories/categories').then((m) => m.CategoriesComponent),
+    title: 'Categories · Ledger',
+  },
+  {
+    path: 'recurring',
+    canActivate: [authGuard],
+    loadComponent: () => import('./recurring/recurring').then((m) => m.RecurringComponent),
+    title: 'Recurring · Ledger',
+  },
+  {
+    path: 'profile',
+    canActivate: [authGuard],
+    loadComponent: () => import('./profile/profile').then((m) => m.Profile),
+    title: 'Account · Ledger',
+  },
+
+  { path: '**', redirectTo: 'dashboard' },
 ];

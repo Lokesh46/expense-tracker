@@ -1,17 +1,191 @@
+/* ============================================================================
+   Ledger — design system
+   ----------------------------------------------------------------------------
+   An editorial-financial aesthetic: brass on ink, hairline rules rather than
+   drop shadows, a high-contrast serif for headings, and tabular monospace
+   figures so money columns align down the page.
+
+   Dark is the default. Light is a warm paper, not a white screen.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Tokens
+   -------------------------------------------------------------------------- */
+
 :root {
-  color-scheme: light;
-  --brand-indigo: #4f46e5;
-  --brand-violet: #8b5cf6;
-  --header-height: 72px;
-  --footer-height: 64px;
-  --slate-900: #0f172a;
-  --slate-700: #334155;
-  --slate-500: #64748b;
-  --surface: rgba(255, 255, 255, 0.86);
-  --surface-border: rgba(148, 163, 184, 0.35);
-  --surface-shadow: 0 28px 60px -40px rgba(15, 23, 42, 0.65);
-  --radius-lg: 1.5rem;
+  color-scheme: dark;
+
+  /* Ink — the dark surface ramp. Slightly desaturated green rather than a
+     neutral grey, which keeps large dark areas from reading as flat black. */
+  --ink-1000: #08090a;
+  --ink-950: #0c0e0f;
+  --ink-900: #111415;
+  --ink-850: #161a1c;
+  --ink-800: #1c2123;
+  --ink-700: #262c2f;
+  --ink-600: #37403f;
+  --ink-500: #55605e;
+  --ink-400: #7a8583;
+  --ink-300: #a3aca9;
+  --ink-200: #c8cfcb;
+  --ink-100: #e2e6e1;
+  --ink-50: #f0f2ee;
+
+  /* Brass — the single accent. Used sparingly: it marks the one thing that
+     matters on a screen, never decoration. */
+  --brass-600: #a9762b;
+  --brass-500: #c9913c;
+  --brass-400: #e0a959;
+  --brass-300: #edc182;
+  --brass-200: #f5dbb4;
+
+  /* Verdigris — positive, under budget, income. */
+  --verdigris-600: #2f7d6f;
+  --verdigris-500: #3d9c8a;
+  --verdigris-400: #56b8a4;
+
+  /* Ember — overspend, destructive, error. */
+  --ember-600: #b04a35;
+  --ember-500: #d05f45;
+  --ember-400: #e58267;
+
+  /* Semantic surfaces */
+  --canvas: var(--ink-1000);
+  --surface: var(--ink-900);
+  --surface-raised: var(--ink-850);
+  --surface-sunken: var(--ink-950);
+  --surface-hover: var(--ink-800);
+
+  --text-primary: var(--ink-50);
+  --text-secondary: var(--ink-300);
+  --text-tertiary: var(--ink-400);
+  --text-inverse: var(--ink-1000);
+
+  --accent: var(--brass-400);
+  --accent-strong: var(--brass-300);
+  --accent-muted: rgba(224, 169, 89, 0.14);
+  --accent-contrast: var(--ink-1000);
+
+  --positive: var(--verdigris-400);
+  --positive-muted: rgba(86, 184, 164, 0.14);
+  --negative: var(--ember-400);
+  --negative-muted: rgba(229, 130, 103, 0.14);
+
+  /* Rules — the structural device of this design. Hairlines, not shadows. */
+  --rule: rgba(226, 230, 225, 0.1);
+  --rule-strong: rgba(226, 230, 225, 0.18);
+  --rule-accent: rgba(224, 169, 89, 0.35);
+
+  --focus-ring: 0 0 0 2px var(--canvas), 0 0 0 4px var(--brass-400);
+
+  /* Type */
+  --font-display: 'Fraunces', 'Iowan Old Style', Georgia, serif;
+  --font-sans: 'Hanken Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Cascadia Mono', monospace;
+
+  /* A 1.2 modular scale, rounded to sensible pixel values. */
+  --text-2xs: 0.6875rem;
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.9375rem;
+  --text-lg: 1.0625rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: 2.25rem;
+  --text-4xl: 3rem;
+  --text-5xl: 4rem;
+
+  /* Spacing — 4px base */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
+  --space-9: 6rem;
+
+  --radius-sm: 3px;
+  --radius-md: 5px;
+  --radius-lg: 8px;
+  --radius-full: 999px;
+
+  --sidebar-width: 232px;
+  --content-max: 1180px;
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 }
+
+/* Warm paper. Deliberately not white — a ledger is printed on stock, and the
+   brass accent dies against pure #fff. */
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --canvas: #f4f1e9;
+  --surface: #fbf9f4;
+  --surface-raised: #ffffff;
+  --surface-sunken: #ece8dd;
+  --surface-hover: #f0ece1;
+
+  --text-primary: #16191a;
+  --text-secondary: #4d5654;
+  --text-tertiary: #67716e;
+  --text-inverse: #fbf9f4;
+
+  /* Darkened until both the accent as text and the primary button's label on
+     top of it clear AA on paper (5.34:1). brass-600 measured only 3.76:1. */
+  --accent: #8a5f20;
+  --accent-strong: #6f4c19;
+  --accent-muted: rgba(138, 95, 32, 0.12);
+  --accent-contrast: #fbf9f4;
+
+  --positive: var(--verdigris-600);
+  --positive-muted: rgba(47, 125, 111, 0.12);
+  --negative: var(--ember-600);
+  --negative-muted: rgba(176, 74, 53, 0.12);
+
+  --rule: rgba(22, 25, 26, 0.12);
+  --rule-strong: rgba(22, 25, 26, 0.2);
+  --rule-accent: rgba(138, 95, 32, 0.4);
+}
+
+/* Respect the OS when the user has not chosen explicitly. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']):not([data-theme='light']) {
+    color-scheme: light;
+
+    --canvas: #f4f1e9;
+    --surface: #fbf9f4;
+    --surface-raised: #ffffff;
+    --surface-sunken: #ece8dd;
+    --surface-hover: #f0ece1;
+
+    --text-primary: #16191a;
+    --text-secondary: #4d5654;
+    --text-tertiary: #67716e;
+    --text-inverse: #fbf9f4;
+
+    --accent: #8a5f20;
+    --accent-strong: #6f4c19;
+    --accent-muted: rgba(138, 95, 32, 0.12);
+    --accent-contrast: #fbf9f4;
+
+    --positive: var(--verdigris-600);
+    --positive-muted: rgba(47, 125, 111, 0.12);
+    --negative: var(--ember-600);
+    --negative-muted: rgba(176, 74, 53, 0.12);
+
+    --rule: rgba(22, 25, 26, 0.12);
+    --rule-strong: rgba(22, 25, 26, 0.2);
+    --rule-accent: rgba(138, 95, 32, 0.4);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   2. Reset and base
+   -------------------------------------------------------------------------- */
 
 *,
 *::before,
@@ -19,79 +193,773 @@
   box-sizing: border-box;
 }
 
-html,
-body {
-  height: 100%;
+* {
   margin: 0;
 }
 
-body {
-  font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial,
-    sans-serif;
-  background:
-    radial-gradient(circle at 0% 0%, rgba(99, 102, 241, 0.25), transparent 55%),
-    radial-gradient(circle at 100% 0%, rgba(236, 72, 153, 0.2), transparent 45%),
-    linear-gradient(165deg, #f9fafb 0%, #eef2ff 100%);
-  color: var(--slate-900);
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
-/* Keep the app background static while content scrolls */
 body {
-  background-attachment: fixed;
-  background-size: cover;
-  background-repeat: no-repeat;
+  min-height: 100vh;
+  background: var(--canvas);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: 1.55;
+  font-synthesis-weight: none;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-/* Reserve space for fixed header and footer to avoid content overlap */
-body {
-  padding-top: var(--header-height);
-  padding-bottom: var(--footer-height);
+/* A faint grain over the whole app. On paper it reads as stock texture; on ink
+   it stops large flat areas from banding. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: -0.015em;
+  /* Fraunces is variable: dial down the optical size axis for headings and
+     lean on its "wonk" for a little editorial character. */
+  font-variation-settings: 'SOFT' 0, 'WONK' 1, 'opsz' 36;
+  text-wrap: balance;
+}
+
+h1 {
+  font-size: var(--text-3xl);
+}
+
+h2 {
+  font-size: var(--text-xl);
+}
+
+h3 {
+  font-size: var(--text-lg);
+}
+
+p {
+  text-wrap: pretty;
 }
 
 a {
   color: inherit;
+  text-decoration-color: var(--rule-accent);
+  text-underline-offset: 3px;
 }
 
-button {
+button,
+input,
+select,
+textarea {
   font: inherit;
+  color: inherit;
 }
 
-.page-card {
-  width: min(720px, 100%);
-  margin: 0 auto;
-  padding: clamp(2rem, 5vw, 2.75rem);
-  background: var(--surface);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--surface-border);
-  box-shadow: var(--surface-shadow);
-  backdrop-filter: blur(18px);
+img,
+svg {
+  display: block;
+  max-width: 100%;
 }
 
-.page-card.full-width {
-  width: 100%;
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm);
 }
 
-/* Shared brand icon used in header/footer */
-.brand-icon {
-  width: 2.25rem;
-  height: 2.25rem;
-  border-radius: 0.6rem;
-  display: inline-block;
+::selection {
+  background: var(--accent-muted);
+  color: var(--text-primary);
 }
 
-/* Unified logout button styling */
-.logout-button {
-  padding: 0.4rem 0.9rem;
-  border-radius: 999px;
-  border: 1px solid rgba(220, 38, 38, 0.22);
-  background: #ffffff;
-  color: #7f1d1d;
-  font-weight: 700;
+/* --------------------------------------------------------------------------
+   3. Typographic utilities
+   -------------------------------------------------------------------------- */
+
+/* Small caps label. The workhorse of this design — every section, table head
+   and field is introduced by one. */
+.eyebrow {
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+/* Money and any figure that appears in a column. Tabular numerals keep digits
+   the same width so decimal points line up vertically. */
+.figure {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  letter-spacing: -0.02em;
+}
+
+.figure-lg {
+  font-size: var(--text-3xl);
+  font-weight: 500;
+}
+
+.text-secondary {
+  color: var(--text-secondary);
+}
+
+.text-tertiary {
+  color: var(--text-tertiary);
+}
+
+.text-positive {
+  color: var(--positive);
+}
+
+.text-negative {
+  color: var(--negative);
+}
+
+/* --------------------------------------------------------------------------
+   4. Controls
+   -------------------------------------------------------------------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: 0.55rem var(--space-4);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
   cursor: pointer;
-  transition: all 0.12s ease;
+  transition:
+    background-color 0.16s var(--ease-out),
+    border-color 0.16s var(--ease-out),
+    color 0.16s var(--ease-out),
+    transform 0.16s var(--ease-out);
 }
 
-.logout-button:hover {
-  background: rgba(220, 38, 38, 0.04);
-  transform: translateY(-2px);
+.btn:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--rule-accent);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast);
+  font-weight: 600;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+}
+
+.btn-ghost {
+  border-color: transparent;
+  color: var(--text-secondary);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+  border-color: transparent;
+}
+
+.btn-danger {
+  color: var(--negative);
+  border-color: transparent;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: var(--negative-muted);
+  border-color: transparent;
+}
+
+.btn-sm {
+  padding: 0.3rem var(--space-3);
+  font-size: var(--text-xs);
+}
+
+/* --- fields --- */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.field > label {
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.input,
+.select,
+.textarea {
+  width: 100%;
+  padding: 0.55rem var(--space-3);
+  background: var(--surface-sunken);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  transition:
+    border-color 0.16s var(--ease-out),
+    background-color 0.16s var(--ease-out);
+}
+
+.input::placeholder,
+.textarea::placeholder {
+  color: var(--text-tertiary);
+  opacity: 0.7;
+}
+
+.input:hover,
+.select:hover,
+.textarea:hover {
+  border-color: var(--rule-strong);
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--surface);
+  box-shadow: 0 0 0 3px var(--accent-muted);
+}
+
+/* Amounts and dates are figures, so they get the mono face while typing too. */
+.input[type='number'],
+.input[type='date'] {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.select {
+  appearance: none;
+  padding-right: var(--space-6);
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position:
+    calc(100% - 16px) calc(50% + 1px),
+    calc(100% - 11px) calc(50% + 1px);
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+
+.textarea {
+  min-height: 5rem;
+  resize: vertical;
+}
+
+.field-error {
+  font-size: var(--text-xs);
+  color: var(--negative);
+}
+
+.input.is-invalid,
+.select.is-invalid {
+  border-color: var(--negative);
+}
+
+/* --------------------------------------------------------------------------
+   5. Structure
+   -------------------------------------------------------------------------- */
+
+/* A bordered block. Deliberately flat: depth here comes from rules and
+   background steps, not shadow. */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-lg);
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--rule);
+}
+
+.panel-body {
+  padding: var(--space-5);
+}
+
+/* The rule under a page title, broken by a short brass segment. The one piece
+   of pure ornament in the system, and it earns its place by making every page
+   instantly recognisable as part of the same document. */
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--rule);
+  position: relative;
+}
+
+.page-head::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  width: 56px;
+  height: 2px;
+  background: var(--accent);
+}
+
+.page-title {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* --- tables --- */
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.table th {
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  border-bottom: 1px solid var(--rule-strong);
+}
+
+.table td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--rule);
+  vertical-align: middle;
+}
+
+.table tbody tr {
+  transition: background-color 0.12s var(--ease-out);
+}
+
+.table tbody tr:hover {
+  background: var(--surface-hover);
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.table .num {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* --- chips and dots --- */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.15rem var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  border: 1px solid var(--rule);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--accent);
+}
+
+/* --- meter --- */
+
+.meter {
+  height: 5px;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+
+.meter-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 0.6s var(--ease-out);
+}
+
+.meter-fill.is-over {
+  background: var(--negative);
+}
+
+.meter-fill.is-safe {
+  background: var(--positive);
+}
+
+/* --- empty state --- */
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-8) var(--space-5);
+  text-align: center;
+  color: var(--text-tertiary);
+}
+
+.empty h3 {
+  color: var(--text-secondary);
+  font-size: var(--text-lg);
+}
+
+.empty p {
+  max-width: 38ch;
+  font-size: var(--text-sm);
+}
+
+/* --------------------------------------------------------------------------
+   6. Motion
+   -------------------------------------------------------------------------- */
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Page content enters as a short staggered cascade. One orchestrated moment on
+   load reads as considered; scattered micro-animations read as noise. */
+.rise {
+  animation: rise 0.5s var(--ease-out) backwards;
+}
+
+.rise-1 { animation-delay: 0.04s; }
+.rise-2 { animation-delay: 0.09s; }
+.rise-3 { animation-delay: 0.14s; }
+.rise-4 { animation-delay: 0.19s; }
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   7. Layout helpers
+   -------------------------------------------------------------------------- */
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.row-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.grid-auto {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --------------------------------------------------------------------------
+   8. Forms shared by the auth screens
+   --------------------------------------------------------------------------
+   These live globally rather than in auth-layout because projected content
+   keeps the scope of the component that wrote it, not of the component that
+   projects it — so auth-layout's own styles would never reach these elements.
+   -------------------------------------------------------------------------- */
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.form-alert {
+  padding: var(--space-3) var(--space-4);
+  border-left: 3px solid var(--negative);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  background: var(--negative-muted);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+}
+
+.form-note {
+  padding: var(--space-3) var(--space-4);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  background: var(--accent-muted);
+  font-size: var(--text-sm);
+}
+
+.btn-block {
+  width: 100%;
+  padding: 0.7rem var(--space-4);
+}
+
+.password-wrap {
+  position: relative;
+}
+
+.password-wrap .input {
+  padding-right: 4.25rem;
+}
+
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: var(--space-2);
+  transform: translateY(-50%);
+  padding: 0.2rem var(--space-2);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.password-toggle:hover {
+  color: var(--accent);
+}
+
+.remember {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.remember input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.auth-switch {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--rule);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.auth-switch a {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.auth-switch a:hover {
+  text-decoration: underline;
+}
+
+/* --------------------------------------------------------------------------
+   9. Forms inside dialogs
+   --------------------------------------------------------------------------
+   Shared by every screen that edits a record. Global for the same projection
+   reason as the auth forms above.
+   -------------------------------------------------------------------------- */
+
+.entry-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* Two fields that belong together — amount and currency, category and date. */
+.pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+@media (max-width: 480px) {
+  .pair {
+    grid-template-columns: 1fr;
+  }
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--rule);
+}
+
+.btn-primary.is-danger {
+  background: var(--negative);
+  border-color: var(--negative);
+  color: #fff;
+}
+
+.btn-primary.is-danger:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.confirm-text {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-5);
+}
+
+.confirm-text strong {
+  color: var(--text-primary);
+}
+
+/* --- file picker --- */
+
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  margin-top: var(--space-4);
+  padding: var(--space-6) var(--space-4);
+  border: 1px dashed var(--rule-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.16s var(--ease-out), background-color 0.16s var(--ease-out);
+}
+
+.dropzone:hover {
+  border-color: var(--accent);
+  background: var(--accent-muted);
+}
+
+.dropzone-title {
+  font-weight: 600;
+  font-size: var(--text-sm);
+}
+
+.dropzone-hint {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.import-errors {
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-left: 3px solid var(--negative);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  background: var(--negative-muted);
+}
+
+.import-errors ul {
+  margin: var(--space-2) 0 0;
+  padding-left: var(--space-4);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.import-errors li + li {
+  margin-top: 2px;
+}
+
+/* --- shared page furniture --- */
+
+.head-actions {
+  flex-wrap: wrap;
+}
+
+.hide-sm {
+  display: table-cell;
+}
+
+@media (max-width: 720px) {
+  .hide-sm {
+    display: none;
+  }
 }

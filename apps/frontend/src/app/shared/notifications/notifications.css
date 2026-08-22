@@ -1,143 +1,100 @@
-.notifications-container {
+.toasts {
   position: fixed;
-  top: 1rem;
-  right: 1rem;
-  z-index: 9999;
+  top: var(--space-5);
+  right: var(--space-5);
+  z-index: 90;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  max-width: 400px;
+  gap: var(--space-2);
+  width: min(360px, calc(100vw - var(--space-6)));
   pointer-events: none;
 }
 
-.notification {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1rem 1.25rem;
-  border-radius: 0.75rem;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
-  animation: slideIn 0.3s ease-out;
-  pointer-events: all;
-}
-
-@keyframes slideIn {
+@keyframes toast-in {
   from {
-    transform: translateX(400px);
     opacity: 0;
+    transform: translateX(16px);
   }
   to {
-    transform: translateX(0);
     opacity: 1;
+    transform: none;
   }
 }
 
-.notification-content {
+.toast {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-3) var(--space-3) 0;
+  background: var(--surface-raised);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  pointer-events: auto;
+  overflow: hidden;
+  animation: toast-in 0.28s var(--ease-out);
+}
+
+/* The status is carried by a colour bar on the leading edge rather than an
+   icon — quieter, and it survives translation. */
+.toast-rule {
+  width: 3px;
+  align-self: stretch;
+  flex-shrink: 0;
+  background: var(--accent);
+}
+
+.toast.is-success .toast-rule {
+  background: var(--positive);
+}
+
+.toast.is-error .toast-rule {
+  background: var(--negative);
+}
+
+.toast.is-warning .toast-rule {
+  background: var(--brass-400);
+}
+
+.toast-message {
   flex: 1;
+  min-width: 0;
 }
 
-.notification-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  font-weight: 700;
-  font-size: 1rem;
+.toast-close {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
   flex-shrink: 0;
-}
-
-.notification-message {
-  font-size: 0.95rem;
-  font-weight: 500;
-  line-height: 1.5;
-}
-
-.notification-close {
-  background: none;
-  border: none;
-  color: inherit;
-  cursor: pointer;
-  font-size: 1.5rem;
-  margin-left: 1rem;
   padding: 0;
-  opacity: 0.7;
-  transition: opacity 0.15s ease;
-  flex-shrink: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: color 0.16s var(--ease-out), background-color 0.16s var(--ease-out);
 }
 
-.notification-close:hover {
-  opacity: 1;
+.toast-close:hover {
+  color: var(--text-primary);
+  background: var(--surface-hover);
 }
 
-/* Success Notification */
-.notification-success {
-  background: #ecfdf5;
-  color: #065f46;
-  border: 1px solid #a7f3d0;
+.toast-close svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
 }
 
-.notification-success .notification-icon {
-  background: #059669;
-  color: #ecfdf5;
-}
-
-/* Error Notification */
-.notification-error {
-  background: #fef2f2;
-  color: #7f1d1d;
-  border: 1px solid #fecaca;
-}
-
-.notification-error .notification-icon {
-  background: #dc2626;
-  color: #fef2f2;
-}
-
-/* Warning Notification */
-.notification-warning {
-  background: #fffbeb;
-  color: #78350f;
-  border: 1px solid #fde68a;
-}
-
-.notification-warning .notification-icon {
-  background: #f59e0b;
-  color: #fffbeb;
-}
-
-/* Info Notification */
-.notification-info {
-  background: #eff6ff;
-  color: #082f49;
-  border: 1px solid #bfdbfe;
-}
-
-.notification-info .notification-icon {
-  background: #0284c7;
-  color: #eff6ff;
-}
-
-@media (max-width: 640px) {
-  .notifications-container {
-    left: 1rem;
-    right: 1rem;
-    max-width: none;
-  }
-
-  .notification {
-    padding: 0.875rem 1rem;
-  }
-
-  .notification-message {
-    font-size: 0.9rem;
-  }
-
-  .notification-close {
-    margin-left: 0.75rem;
+@media (max-width: 860px) {
+  .toasts {
+    top: var(--space-3);
+    right: var(--space-3);
+    left: var(--space-3);
+    width: auto;
   }
 }

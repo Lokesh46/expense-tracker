@@ -1,16 +1,31 @@
-import { Component } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { Component, inject } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { Router, RouterOutlet } from '@angular/router';
+
+import { AuthService } from './core/services/auth.service';
 import { NotificationsComponent } from './shared/notifications/notifications';
-import { Header } from './shared/header/header';
+import { SidebarComponent } from './shared/sidebar/sidebar';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, NotificationsComponent, Header],
+  imports: [RouterOutlet, NotificationsComponent, SidebarComponent],
   templateUrl: './app.html',
-  styleUrl: './app.css'
+  styleUrl: './app.css',
 })
 export class App {
-  protected readonly title = 'Personal Expense Tracker';
+  private readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
+
+  /**
+   * The sign-in and register screens are full-bleed and have no navigation, so
+   * the shell only wraps the app once there is a session.
+   */
+  protected readonly isAuthenticated = toSignal(this.auth.isAuthenticated$, {
+    initialValue: false,
+  });
+
+  protected skipToContent(event: Event): void {
+    event.preventDefault();
+    document.getElementById('main-content')?.focus();
+  }
 }
-
-

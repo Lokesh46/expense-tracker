@@ -1,99 +1,112 @@
-<section class="page-card full-width categories-wrapper">
-  <header class="categories-header">
-    <span class="header-badge">Management</span>
-    <h2>Categories</h2>
-    <p class="subtitle">Create and manage your expense categories to better organize your spending.</p>
-  </header>
+<header class="page-head rise rise-1">
+  <div class="page-title">
+    <p class="eyebrow">Setup</p>
+    <h1>Categories</h1>
+  </div>
+  <button type="button" class="btn btn-primary btn-sm" (click)="openCreate()">Add category</button>
+</header>
 
-  <!-- Create/Edit Form Section -->
-  <section class="form-section" *ngIf="!showCreateForm()">
-    <button type="button" class="primary-btn" (click)="showCreateForm.set(true)">
-      + Create New Category
-    </button>
-  </section>
+<p class="lede rise rise-2">
+  Categories are yours alone — other accounts never see or change them. Each one carries a colour
+  that identifies it in charts and in the ledger.
+</p>
 
-  <section class="form-section" *ngIf="showCreateForm()">
-    <h3>{{ isEditMode ? 'Edit Category' : 'Create New Category' }}</h3>
-    <form [formGroup]="categoryForm" (ngSubmit)="isEditMode ? onUpdateSubmit() : onCreateSubmit()">
-      <div class="form-group">
-        <label for="categoryName">Category Name</label>
+@if (isLoading()) {
+  <div class="panel rise rise-3">
+    <div class="empty"><p>Loading…</p></div>
+  </div>
+} @else if (categories().length === 0) {
+  <div class="panel rise rise-3">
+    <div class="empty">
+      <h3>No categories yet</h3>
+      <p>Add one and it becomes available everywhere you record spending.</p>
+      <button type="button" class="btn btn-primary btn-sm" (click)="openCreate()">
+        Add category
+      </button>
+    </div>
+  </div>
+} @else {
+  <ul class="cat-grid rise rise-3">
+    @for (category of categories(); track category.id) {
+      <li class="cat-card">
+        <span class="cat-swatch" [style.background]="category.color" aria-hidden="true"></span>
+        <span class="cat-name">{{ category.name }}</span>
+        <span class="cat-actions">
+          <button type="button" class="btn btn-ghost btn-sm" (click)="openEdit(category)">
+            Edit
+          </button>
+          <button
+            type="button"
+            class="btn btn-danger btn-sm"
+            (click)="pendingDelete.set(category)"
+          >
+            Delete
+          </button>
+        </span>
+      </li>
+    }
+  </ul>
+}
+
+@if (isFormOpen()) {
+  <app-modal
+    [heading]="editingId() ? 'Edit category' : 'New category'"
+    (closed)="isFormOpen.set(false)"
+  >
+    <form class="entry-form" [formGroup]="form" (ngSubmit)="save()" novalidate>
+      <div class="field">
+        <label for="name">Name</label>
         <input
-          id="categoryName"
+          id="name"
+          class="input"
           type="text"
           formControlName="name"
-          placeholder="Enter category name (e.g., Groceries, Utilities)"
-          class="form-input"
+          [class.is-invalid]="invalid('name')"
         />
-        <div class="form-error" *ngIf="categoryForm.get('name')?.invalid && categoryForm.get('name')?.touched">
-          <span *ngIf="categoryForm.get('name')?.errors?.['required']">Category name is required</span>
-          <span *ngIf="categoryForm.get('name')?.errors?.['minlength']">Name must be at least 3 characters</span>
-          <span *ngIf="categoryForm.get('name')?.errors?.['maxlength']">Name must not exceed 50 characters</span>
+        @if (invalid('name')) {
+          <span class="field-error">Use between 2 and 50 characters.</span>
+        }
+      </div>
+
+      <div class="field">
+        <label id="colour-label">Colour</label>
+        <div class="swatches" role="radiogroup" aria-labelledby="colour-label">
+          @for (color of palette; track color) {
+            <button
+              type="button"
+              class="swatch"
+              role="radio"
+              [class.is-selected]="form.controls.color.value === color"
+              [attr.aria-checked]="form.controls.color.value === color"
+              [attr.aria-label]="'Colour ' + color"
+              [style.background]="color"
+              (click)="form.controls.color.setValue(color)"
+            ></button>
+          }
         </div>
       </div>
 
       <div class="form-actions">
-        <button
-          type="submit"
-          [disabled]="isFormLoading() || categoryForm.invalid"
-          class="submit-btn"
-        >
-          {{ isFormLoading() ? 'Loading...' : (isEditMode ? 'Update Category' : 'Create Category') }}
-        </button>
-        <button type="button" (click)="onCancel()" class="cancel-btn" [disabled]="isFormLoading()">
-          Cancel
+        <button type="button" class="btn" (click)="isFormOpen.set(false)">Cancel</button>
+        <button type="submit" class="btn btn-primary" [disabled]="isSaving()">
+          {{ isSaving() ? 'Saving…' : editingId() ? 'Save changes' : 'Add category' }}
         </button>
       </div>
     </form>
-  </section>
+  </app-modal>
+}
 
-  <!-- Loading State -->
-  <section class="loading-state" *ngIf="isLoading()">
-    <p>Loading categories...</p>
-  </section>
-
-  <!-- Categories Table -->
-  <section class="table-section" *ngIf="!isLoading() && categories().length > 0">
-    <h3>Existing Categories</h3>
-    <div class="table-wrapper">
-      <table class="categories-table">
-        <thead>
-          <tr>
-            <th>Category Name</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let category of categories()">
-            <td>{{ category.name }}</td>
-            <td class="actions-cell">
-              <button
-                type="button"
-                class="action-btn edit-btn"
-                (click)="onEditClick(category)"
-                title="Edit category"
-              >
-                Edit
-              </button>
-              <button
-                type="button"
-                class="action-btn delete-btn"
-                (click)="onDeleteClick(category.id)"
-                title="Delete category"
-              >
-                Delete
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+@if (pendingDelete(); as target) {
+  <app-modal heading="Delete this category?" (closed)="pendingDelete.set(null)">
+    <p class="confirm-text">
+      <strong>{{ target.name }}</strong> will be removed. If any transactions still use it, the
+      deletion is refused so nothing is silently orphaned.
+    </p>
+    <div class="form-actions">
+      <button type="button" class="btn" (click)="pendingDelete.set(null)">Keep it</button>
+      <button type="button" class="btn btn-primary is-danger" (click)="confirmDelete()">
+        Delete
+      </button>
     </div>
-  </section>
-
-  <!-- Empty State -->
-  <section class="empty-state" *ngIf="!isLoading() && categories().length === 0">
-    <p>No categories found. Create your first category to get started.</p>
-    <button type="button" class="primary-btn" (click)="showCreateForm.set(true)">
-      Create First Category
-    </button>
-  </section>
-</section>
+  </app-modal>
+}

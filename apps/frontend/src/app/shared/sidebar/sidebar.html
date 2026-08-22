@@ -1,0 +1,66 @@
+<nav class="sidebar" aria-label="Main">
+  <a class="brand" routerLink="/dashboard">
+    <!-- Three stacked rules of decreasing length: a ledger entry, reduced to a mark. -->
+    <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="3" y="4" width="18" height="2.5" rx="1" />
+      <rect x="3" y="10.75" width="13" height="2.5" rx="1" />
+      <rect x="3" y="17.5" width="8" height="2.5" rx="1" />
+    </svg>
+    <span class="brand-name">Ledger</span>
+  </a>
+
+  <ul class="nav">
+    @for (item of navItems; track item.path) {
+      <li>
+        <a
+          class="nav-link"
+          [routerLink]="item.path"
+          routerLinkActive="is-active"
+          #rla="routerLinkActive"
+          [attr.aria-current]="rla.isActive ? 'page' : null"
+        >
+          <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path [attr.d]="item.icon" />
+          </svg>
+          <span class="nav-label">{{ item.label }}</span>
+        </a>
+      </li>
+    }
+  </ul>
+
+  <div class="sidebar-foot">
+    <button
+      type="button"
+      class="theme-toggle"
+      (click)="themeService.toggle()"
+      [attr.aria-label]="
+        themeService.theme() === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'
+      "
+    >
+      @if (themeService.theme() === 'dark') {
+        <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="4.5" />
+          <path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8" />
+        </svg>
+        <span class="nav-label">Light</span>
+      } @else {
+        <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z" />
+        </svg>
+        <span class="nav-label">Dark</span>
+      }
+    </button>
+
+    <a class="account" routerLink="/profile" routerLinkActive="is-active">
+      <span class="avatar" aria-hidden="true">{{ initial }}</span>
+      <span class="account-name">{{ username }}</span>
+    </a>
+
+    <button type="button" class="sign-out" (click)="signOut()">
+      <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M14 4h4.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H14M10 16l-4-4 4-4M6 12h10" />
+      </svg>
+      <span class="nav-label">Sign out</span>
+    </button>
+  </div>
+</nav>

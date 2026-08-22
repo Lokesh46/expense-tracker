@@ -1,0 +1,63 @@
+<div class="auth">
+  <!-- Editorial side. Purely typographic: no stock illustration, no gradient blob. -->
+  <aside class="auth-aside">
+    <div class="auth-brand">
+      <svg class="auth-mark" viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="3" y="4" width="18" height="2.5" rx="1" />
+        <rect x="3" y="10.75" width="13" height="2.5" rx="1" />
+        <rect x="3" y="17.5" width="8" height="2.5" rx="1" />
+      </svg>
+      <span>Ledger</span>
+    </div>
+
+    <div class="auth-statement">
+      <p class="auth-quote rise rise-1">
+        Every pound has<br />
+        <em>somewhere</em> it went.
+      </p>
+      <p class="auth-sub rise rise-2">
+        A plain account of what you spend — categorised, budgeted, and totalled without ceremony.
+      </p>
+    </div>
+
+    <!-- A miniature ledger, rendered from the same rules used across the app. -->
+    <ul class="auth-lines rise rise-3" aria-hidden="true">
+      <li><span>Groceries</span><span class="figure">124.80</span></li>
+      <li><span>Rent &amp; Bills</span><span class="figure">1,200.00</span></li>
+      <li><span>Transport</span><span class="figure">62.15</span></li>
+      <li class="is-total"><span>This month</span><span class="figure">1,386.95</span></li>
+    </ul>
+  </aside>
+
+  <main class="auth-main">
+    <button
+      type="button"
+      class="auth-theme"
+      (click)="themeService.toggle()"
+      [attr.aria-label]="
+        themeService.theme() === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'
+      "
+    >
+      @if (themeService.theme() === 'dark') {
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="4.5" />
+          <path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8" />
+        </svg>
+      } @else {
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z" />
+        </svg>
+      }
+    </button>
+
+    <div class="auth-panel rise rise-1">
+      <header class="auth-head">
+        <p class="eyebrow">{{ eyebrow() }}</p>
+        <h1>{{ heading() }}</h1>
+        <p class="auth-blurb">{{ blurb() }}</p>
+      </header>
+
+      <ng-content />
+    </div>
+  </main>
+</div>

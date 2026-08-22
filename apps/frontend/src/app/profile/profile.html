@@ -1,68 +1,88 @@
-<section class="page-card profile-wrapper">
-  <header class="profile-header">
-    <span class="welcome-badge">Profile</span>
-    <h2>Personal preferences</h2>
-    <p class="subtitle">
-      Update how we talk to you, manage currencies, and tailor reminders around your routine.
+<header class="page-head rise rise-1">
+  <div class="page-title">
+    <p class="eyebrow">Account</p>
+    <h1>{{ username }}</h1>
+  </div>
+  <button type="button" class="btn btn-sm" (click)="signOut()">Sign out</button>
+</header>
+
+<section class="identity panel rise rise-2">
+  <span class="identity-avatar" aria-hidden="true">{{ initial }}</span>
+  <div>
+    <p class="identity-name">{{ username }}</p>
+    <p class="identity-meta text-tertiary">Session valid until {{ expiry() }}</p>
+  </div>
+</section>
+
+<section class="grid-auto rise rise-3">
+  <div class="stat panel">
+    <p class="eyebrow">Transactions</p>
+    <p class="figure stat-value">
+      {{ transactionCount() === null ? '—' : transactionCount() }}
     </p>
+  </div>
+  <div class="stat panel">
+    <p class="eyebrow">Categories</p>
+    <p class="figure stat-value">{{ categoryService.categories().length }}</p>
+  </div>
+  <div class="stat panel">
+    <p class="eyebrow">Recurring rules</p>
+    <p class="figure stat-value">{{ recurringCount() === null ? '—' : recurringCount() }}</p>
+  </div>
+</section>
+
+<section class="panel rise rise-4">
+  <header class="panel-header">
+    <h2>Appearance</h2>
   </header>
+  <div class="panel-body">
+    <div class="theme-choice" role="radiogroup" aria-label="Theme">
+      <button
+        type="button"
+        role="radio"
+        class="theme-option"
+        [class.is-selected]="themeService.theme() === 'dark'"
+        [attr.aria-checked]="themeService.theme() === 'dark'"
+        (click)="setTheme('dark')"
+      >
+        <span class="theme-swatch is-dark" aria-hidden="true"></span>
+        <span>
+          <span class="theme-name">Ink</span>
+          <span class="theme-desc">Dark, for long sessions</span>
+        </span>
+      </button>
 
-  <form [formGroup]="profileForm" (ngSubmit)="onSubmit()" novalidate>
-    <section class="form-grid">
-      <div class="field">
-        <label for="fullName">Full name</label>
-        <input id="fullName" type="text" formControlName="fullName" placeholder="Your name" />
-      </div>
-
-      <div class="field">
-        <label for="email">Email</label>
-        <input id="email" type="email" formControlName="email" placeholder="you@example.com" />
-      </div>
-
-      <div class="field">
-        <label for="currency">Preferred currency</label>
-        <select id="currency" formControlName="currency">
-          <option value="INR">Indian Rupee (₹)</option>
-          <option value="USD">US Dollar ($)</option>
-          <option value="EUR">Euro (€)</option>
-        </select>
-      </div>
-
-      <div class="field">
-        <label for="reminderDay">Reminder day</label>
-        <input
-          id="reminderDay"
-          type="number"
-          formControlName="reminderDay"
-          min="1"
-          max="28"
-          placeholder="5"
-        />
-        <span class="helper">Choose when monthly summaries hit your inbox (1-28).</span>
-      </div>
-    </section>
-
-    <section class="notifications" formGroupName="notifications">
-      <h3>Notifications</h3>
-      <label>
-        <input type="checkbox" formControlName="email" />
-        Email alerts for new expenses and category limits
-      </label>
-      <label>
-        <input type="checkbox" formControlName="push" />
-        Push notifications on mobile (coming soon)
-      </label>
-      <label>
-        <input type="checkbox" formControlName="monthlyDigest" />
-        Monthly digest with trends and highlights
-      </label>
-    </section>
-
-    <div class="actions">
-      <button type="submit" [disabled]="isSaving()" class="primary">Save changes</button>
-      <button type="button" (click)="resetPreferences()" class="ghost">Reset</button>
+      <button
+        type="button"
+        role="radio"
+        class="theme-option"
+        [class.is-selected]="themeService.theme() === 'light'"
+        [attr.aria-checked]="themeService.theme() === 'light'"
+        (click)="setTheme('light')"
+      >
+        <span class="theme-swatch is-light" aria-hidden="true"></span>
+        <span>
+          <span class="theme-name">Paper</span>
+          <span class="theme-desc">Warm light, for daylight</span>
+        </span>
+      </button>
     </div>
+  </div>
+</section>
 
-    <p *ngIf="saveMessage()" class="status">{{ saveMessage() }}</p>
-  </form>
+<section class="panel rise rise-4">
+  <header class="panel-header">
+    <h2>Your data</h2>
+  </header>
+  <div class="panel-body stack">
+    <p class="text-secondary data-note">
+      Everything you record belongs to your account alone — categories, budgets and transactions
+      are never shared with, or visible to, another account.
+    </p>
+    <div>
+      <button type="button" class="btn" (click)="exportEverything()">
+        Export everything as CSV
+      </button>
+    </div>
+  </div>
 </section>

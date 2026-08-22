@@ -1,85 +1,89 @@
-<section class="page-card register-wrapper">
-  <header class="register-header">
-    <span class="welcome-badge">Join us</span>
-    <h2>Create your account</h2>
-    <p class="subtitle">Set up your profile to start tracking expenses effortlessly.</p>
-  </header>
+<app-auth-layout
+  eyebrow="Create account"
+  heading="Start your ledger"
+  blurb="Your categories are set up for you — you can record an expense straight away."
+>
+  <form class="auth-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    @if (errorMessage(); as message) {
+      <p class="form-alert" role="alert">{{ message }}</p>
+    }
 
-  <div *ngIf="errorMessage()" class="alert error">{{ errorMessage() }}</div>
-  <div *ngIf="successMessage()" class="alert success">{{ successMessage() }}</div>
-
-  <form [formGroup]="registerForm" (ngSubmit)="onSubmit()" novalidate>
-    <div class="form-field">
+    <div class="field">
       <label for="username">Username</label>
       <input
         id="username"
+        class="input"
         type="text"
         formControlName="username"
         autocomplete="username"
-        placeholder="Choose a username"
-        [class.invalid]="showFieldError('username')"
+        [class.is-invalid]="invalid('username')"
       />
-      <span *ngIf="showFieldError('username')" class="field-error">
-        {{ showFieldError('username') }}
-      </span>
+      @if (invalid('username')) {
+        <span class="field-error">Use between 3 and 30 characters.</span>
+      }
     </div>
 
-    <div class="form-field">
-      <label for="email">Email</label>
+    <div class="field">
+      <label for="email">Email <span class="text-tertiary">(optional)</span></label>
       <input
         id="email"
+        class="input"
         type="email"
         formControlName="email"
         autocomplete="email"
-        placeholder="you@example.com"
-        [class.invalid]="registerForm.get('email')?.invalid && registerForm.get('email')?.touched"
+        [class.is-invalid]="invalid('email')"
       />
-      <span *ngIf="registerForm.get('email')?.invalid && registerForm.get('email')?.touched" class="field-error">
-        <span *ngIf="registerForm.get('email')?.errors?.['required']">Email is required.</span>
-        <span *ngIf="registerForm.get('email')?.errors?.['email']">Enter a valid email address.</span>
-      </span>
+      @if (invalid('email')) {
+        <span class="field-error">That does not look like an email address.</span>
+      }
     </div>
 
-    <div class="form-field">
+    <div class="field">
       <label for="password">Password</label>
-      <input
-        id="password"
-        type="password"
-        formControlName="password"
-        autocomplete="new-password"
-        placeholder="Create a password"
-        [class.invalid]="showFieldError('password')"
-      />
-      <span *ngIf="showFieldError('password')" class="field-error">
-        {{ showFieldError('password') }}
-      </span>
+      <div class="password-wrap">
+        <input
+          id="password"
+          class="input"
+          [type]="showPassword() ? 'text' : 'password'"
+          formControlName="password"
+          autocomplete="new-password"
+          [class.is-invalid]="invalid('password')"
+        />
+        <button
+          type="button"
+          class="password-toggle"
+          (click)="showPassword.set(!showPassword())"
+          [attr.aria-label]="showPassword() ? 'Hide password' : 'Show password'"
+        >
+          {{ showPassword() ? 'Hide' : 'Show' }}
+        </button>
+      </div>
+      @if (invalid('password')) {
+        <span class="field-error">At least 8 characters.</span>
+      }
     </div>
 
-    <div class="form-field">
+    <div class="field">
       <label for="confirmPassword">Confirm password</label>
       <input
         id="confirmPassword"
-        type="password"
+        class="input"
+        [type]="showPassword() ? 'text' : 'password'"
         formControlName="confirmPassword"
         autocomplete="new-password"
-        placeholder="Confirm your password"
-        [class.invalid]="showFieldError('confirmPassword')"
+        [class.is-invalid]="mismatched"
       />
-      <span *ngIf="showFieldError('confirmPassword')" class="field-error">
-        {{ showFieldError('confirmPassword') }}
-      </span>
+      @if (mismatched) {
+        <span class="field-error">The two passwords do not match.</span>
+      }
     </div>
 
-    <button type="submit" class="submit-btn" [disabled]="isSubmitting()">
-      <span *ngIf="!isSubmitting(); else loading">Create account</span>
+    <button type="submit" class="btn btn-primary btn-block" [disabled]="isSubmitting()">
+      {{ isSubmitting() ? 'Creating…' : 'Create account' }}
     </button>
-    <ng-template #loading>
-      <span class="loading">Creating your account...</span>
-    </ng-template>
-  </form>
 
-  <p class="login-copy">
-    Already have an account?
-    <a routerLink="/login">Sign in</a>
-  </p>
-</section>
+    <p class="auth-switch">
+      Already have an account? <a routerLink="/login">Sign in</a>
+    </p>
+  </form>
+</app-auth-layout>
