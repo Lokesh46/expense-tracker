@@ -124,7 +124,13 @@ scripts/
   run-backend.mjs   Locates a JDK and launches Maven with the right flags
   setup-db-env.mjs  Converts a provider's connection string into apps/backend/.env
   load-env.mjs      Reads apps/backend/.env for the --prod check
+  make-icons.py     Regenerates the favicon rasters from the brand mark
 ```
+
+The tab icon lives in `apps/frontend/public/`. `icon.svg` is the source of truth
+and what browsers actually use; the `.ico` and `apple-touch-icon.png` beside it
+are derived, for Safari before 16.4, iOS home screens and Windows shortcuts. Only
+run `python scripts/make-icons.py apps/frontend/public` if the mark changes.
 
 ## Data and configuration
 
@@ -259,7 +265,7 @@ authenticated, and a `401` would make the client throw away a valid token.
 npm test
 ```
 
-214 tests: 131 on the backend, 83 on the frontend.
+220 tests: 137 on the backend, 83 on the frontend.
 
 The backend tests drive the application through MockMvc rather than calling
 services directly, because the defects worth guarding against — the password

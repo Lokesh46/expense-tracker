@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img"
+     aria-label="Ledger">
+  <!--
+    Three stacked rules of decreasing length: a ledger entry, reduced to a mark.
+    The same glyph as the sidebar brand, on a filled tile so it reads against a
+    light or a dark browser tab strip rather than only one of them. Offsets and
+    widths are even so that halving the grid to 16 leaves every edge on a whole
+    pixel.
+  -->
+  <rect width="32" height="32" rx="7" fill="#0c0e0f"/>
+  <g fill="#e0a959">
+    <rect x="6" y="6" width="20" height="4" rx="2"/>
+    <rect x="6" y="14" width="14" height="4" rx="2"/>
+    <rect x="6" y="22" width="8" height="4" rx="2"/>
+  </g>
+</svg>

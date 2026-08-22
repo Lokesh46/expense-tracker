@@ -6,7 +6,26 @@
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Track spending, set monthly budgets and keep recurring costs in view.">
-  <link rel="icon" type="image/svg+xml" href="/assets/icon.svg">
+  <!--
+    The brand mark, three stacked rules, as the tab icon.
+
+    This used to point at /assets/icon.svg, which never existed -- there is no
+    assets directory, and public/ is copied to the site root -- so every load
+    404ed and the browser fell back to the stock Angular favicon.ico.
+
+    The SVG is preferred and stays crisp at any size. The .ico is there for
+    Safari before 16.4 and for Windows shortcuts, and carries 16, 32 and 48px.
+  -->
+  <link rel="icon" type="image/svg+xml" href="/icon.svg">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+  <!--
+    Tints browser chrome on mobile to match the theme, so the app does not sit in
+    a strip of the wrong colour. Matches --canvas in styles.css.
+  -->
+  <meta name="theme-color" content="#f4f1e9" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0c0e0f" media="(prefers-color-scheme: dark)">
 
   <!--
     Fraunces  - editorial display serif, variable (opsz / SOFT / WONK axes)
