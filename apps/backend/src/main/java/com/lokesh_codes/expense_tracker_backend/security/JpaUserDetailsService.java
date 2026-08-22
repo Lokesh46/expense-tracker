@@ -29,10 +29,16 @@ public class JpaUserDetailsService implements UserDetailsService {
 
         User user = userOptional.get();
 
+        // The stored value is a BCrypt hash written by the registration endpoint,
+        // so it is handed over untouched and verified by the configured
+        // PasswordEncoder. Prefixing it with "{noop}" (as this once did) told
+        // Spring Security to treat the hash as plaintext, which made every
+        // login fail.
         return org.springframework.security.core.userdetails.User
                 .withUsername(user.getUsername())
-                .password("{noop}" + user.getPassword()) // use "{noop}" for plain text or encode properly
-                .roles("USER") // or fetch from DB if you have a role column
+                .password(user.getPassword())
+                .roles(user.getRole() == null ? "USER" : user.getRole())
+                .disabled(!user.isActive())
                 .build();
     }
 }

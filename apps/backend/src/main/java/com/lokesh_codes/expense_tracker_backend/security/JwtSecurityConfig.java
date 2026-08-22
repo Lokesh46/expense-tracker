@@ -1,10 +1,5 @@
 package com.lokesh_codes.expense_tracker_backend.security;
 
-import java.security.KeyPair;
-import java.security.KeyPairGenerator;
-import java.security.interfaces.RSAPrivateKey;
-import java.security.interfaces.RSAPublicKey;
-import java.util.UUID;
 import static org.springframework.security.config.Customizer.withDefaults;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -63,8 +58,6 @@ public class JwtSecurityConfig {
                                                                 new BearerTokenAuthenticationEntryPoint())
                                                                 .accessDeniedHandler(
                                                                                 new BearerTokenAccessDeniedHandler()))
-                                .httpBasic(
-                                                withDefaults()) // (5)
                                 .headers(header -> header
                                                 .frameOptions(frameOptionsConfig -> frameOptionsConfig.sameOrigin()))
                                 .build();
@@ -72,9 +65,13 @@ public class JwtSecurityConfig {
 
         @Bean
         public AuthenticationManager authenticationManager(
-                        UserDetailsService userDetailsService) {
+                        UserDetailsService userDetailsService,
+                        PasswordEncoder passwordEncoder) {
                 var authenticationProvider = new DaoAuthenticationProvider();
                 authenticationProvider.setUserDetailsService(userDetailsService);
+                // Without this the provider falls back to the delegating encoder,
+                // which cannot read the bare BCrypt hashes stored by /register.
+                authenticationProvider.setPasswordEncoder(passwordEncoder);
                 return new ProviderManager(authenticationProvider);
         }
 
@@ -90,8 +87,8 @@ public class JwtSecurityConfig {
         // }
 
         @Bean
-        public JWKSource<SecurityContext> jwkSource() {
-                JWKSet jwkSet = new JWKSet(rsaKey());
+        public JWKSource<SecurityContext> jwkSource(RSAKey rsaKey) {
+                JWKSet jwkSet = new JWKSet(rsaKey);
                 return (((jwkSelector, securityContext) -> jwkSelector.select(jwkSet)));
         }
 
@@ -101,33 +98,19 @@ public class JwtSecurityConfig {
         }
 
         @Bean
-        JwtDecoder jwtDecoder() throws JOSEException {
+        JwtDecoder jwtDecoder(RSAKey rsaKey) throws JOSEException {
                 return NimbusJwtDecoder
-                                .withPublicKey(rsaKey().toRSAPublicKey())
+                                .withPublicKey(rsaKey.toRSAPublicKey())
                                 .build();
         }
 
+        /**
+         * The signing key is loaded from disk rather than generated per boot, so
+         * tokens stay valid across restarts. See {@link JwtKeyProvider}.
+         */
         @Bean
-        public RSAKey rsaKey() {
-
-                KeyPair keyPair = keyPair();
-
-                return new RSAKey.Builder((RSAPublicKey) keyPair.getPublic())
-                                .privateKey((RSAPrivateKey) keyPair.getPrivate())
-                                .keyID(UUID.randomUUID().toString())
-                                .build();
-        }
-
-        @Bean
-        public KeyPair keyPair() {
-                try {
-                        var keyPairGenerator = KeyPairGenerator.getInstance("RSA");
-                        keyPairGenerator.initialize(2048);
-                        return keyPairGenerator.generateKeyPair();
-                } catch (Exception e) {
-                        throw new IllegalStateException(
-                                        "Unable to generate an RSA Key Pair", e);
-                }
+        public RSAKey rsaKey(JwtKeyProvider keyProvider) {
+                return keyProvider.loadOrCreate();
         }
 
         @Bean
