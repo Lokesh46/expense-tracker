@@ -1,0 +1,26 @@
+{
+  "name": "expense-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Expense Tracker - Angular frontend and Spring Boot backend in one repository",
+  "workspaces": [
+    "apps/frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c cyan,magenta --kill-others-on-fail \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "node scripts/run-backend.mjs",
+    "dev:web": "npm --workspace apps/frontend run start",
+    "build": "npm run build:api && npm run build:web",
+    "build:api": "node scripts/run-backend.mjs --package-only",
+    "build:web": "npm --workspace apps/frontend run build",
+    "test": "npm run test:api && npm run test:web",
+    "test:api": "node scripts/run-backend.mjs --test-only",
+    "test:web": "npm --workspace apps/frontend run test -- --watch=false --browsers=ChromeHeadless"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

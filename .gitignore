@@ -1,0 +1,28 @@
+# --- dependencies ---
+node_modules/
+
+# --- build output ---
+dist/
+target/
+.angular/
+
+# --- local runtime state ---
+# Contains the H2 database *and* the JWT signing key. Never commit.
+data/
+apps/backend/data/
+.tmp/
+
+# --- environment ---
+.env
+.env.local
+*.local
+
+# --- editors / OS ---
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+
+# --- logs ---
+*.log
+npm-debug.log*
