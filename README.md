@@ -1,11 +1,11 @@
-# Expense Tracker
+# Ledger — Expense Tracker
 
-A personal expense tracker: **Angular 20** frontend and a **Spring Boot 3.5** REST API,
-kept in one repository.
+A personal expense tracker: an **Angular 20** frontend and a **Spring Boot 3.5**
+REST API, in one repository.
 
-This repo is the merge of two previously separate projects. The full commit
-history of both is preserved — `git log` reaches every original commit, and
-`git blame` still points at the commit that wrote each line.
+This repo is the merge of two previously separate projects. The full history of
+both is preserved — `git log` reaches every original commit, and `git blame`
+still points at the commit that wrote each line.
 
 | Was | Now |
 |---|---|
@@ -16,7 +16,7 @@ history of both is preserved — `git log` reaches every original commit, and
 
 ## Quick start
 
-Requires **Node 20+** and a **JDK 17+** (21 recommended). No database server
+Requires **Node 20+** and a **JDK 17+** (21 recommended). No database server is
 needed — local development runs on a file-backed H2 database.
 
 ```bash
@@ -24,23 +24,49 @@ npm install
 npm run dev
 ```
 
-That starts both halves:
-
 | | URL |
 |---|---|
 | Frontend | http://localhost:4300 |
 | API | http://localhost:8081 |
 | H2 console (dev only) | http://localhost:8081/h2-console |
 
+Port 4300 rather than Angular's default 4200, which is commonly already taken.
+
 The dev server proxies `/api`, `/authenticate` and `/register` to port 8081, so
 the browser only ever talks to one origin and CORS stays out of the way.
 
-### Running each half on its own
+### Other commands
 
 ```bash
-npm run dev:api
-npm run dev:web
+npm run dev:api      # backend only
+npm run dev:web      # frontend only
+npm run build        # build both
+npm test             # run both test suites
 ```
+
+---
+
+## What it does
+
+- **Transactions** — record spending, with filtering, search, sorting and paging
+  all evaluated in the database.
+- **Categories** — private to each account, seeded with eight starters on sign-up,
+  each with a colour used consistently across charts and lists.
+- **Budgets** — a monthly cap per category. The cap is stored; spend is derived
+  from the transactions of whichever month you are looking at, so past months
+  stay truthful when you change a limit.
+- **Recurring** — rent, subscriptions and standing orders. Rules run overnight and
+  also catch up when you open your ledger, one period at a time, so a rule left
+  dormant produces every entry it missed rather than a single lump.
+- **CSV import and export** — the parser copes with quoted fields, embedded
+  commas, escaped quotes, several date layouts, thousands separators and
+  parenthesised negatives, and reports bad rows individually instead of
+  rejecting a whole statement over one line.
+- **Light and dark themes** — both measured to clear WCAG AA contrast.
+
+Amounts are formatted in the currency they were recorded in. Where a month mixes
+currencies, the overview says so rather than presenting the sum of unlike
+amounts as a total.
 
 ---
 
@@ -49,7 +75,7 @@ npm run dev:web
 ```
 apps/
   backend/     Spring Boot 3.5 · Java 21 · Spring Security + JWT · JPA
-  frontend/    Angular 20 · standalone components · Chart.js
+  frontend/    Angular 20 · standalone components · lazy routes · Chart.js
 scripts/
   run-backend.mjs   Locates a JDK and launches Maven with the right flags
 ```
@@ -77,8 +103,8 @@ and reads everything from the environment:
 | `DATABASE_URL` | JDBC URL, e.g. `jdbc:postgresql://host:5432/expense` |
 | `DATABASE_USERNAME` | |
 | `DATABASE_PASSWORD` | |
-| `FRONTEND_URL` | Exact origin allowed by CORS |
-| `JWT_KEY_STORE` | Path to the signing key. Point at a mounted volume — a container filesystem is wiped on redeploy, which would log everyone out. |
+| `FRONTEND_URL` | Allowed browser origins, comma-separated. Patterns such as `http://localhost:[*]` are accepted. |
+| `JWT_KEY_STORE` | Path to the signing key. Point it at a mounted volume — a container filesystem is wiped on redeploy, which would sign everyone out. |
 | `PORT` | Defaults to 8081 |
 
 The frontend's production API URL is compiled in, from
@@ -90,16 +116,41 @@ The frontend's production API URL is compiled in, from
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
-| `POST` | `/register` | — | Create an account |
+| `POST` | `/register` | — | Create an account (seeds starter categories) |
 | `POST` | `/authenticate` | — | Exchange credentials for a JWT |
-| `GET/POST` | `/api/categories` | Bearer | List / create categories |
-| `GET/PUT/DELETE` | `/api/categories/{id}` | Bearer | Single category |
-| `GET/POST` | `/api/transactions` | Bearer | List / create transactions |
+| `GET` | `/api/transactions` | Bearer | Search: `page`, `size`, `sort`, `categoryId`, `from`, `to`, `minAmount`, `maxAmount`, `paymentMethod`, `search` |
+| `POST` | `/api/transactions` | Bearer | Record one |
 | `GET/PUT/DELETE` | `/api/transactions/{id}` | Bearer | Single transaction |
+| `GET` | `/api/transactions/export` | Bearer | CSV of everything matching the same filters |
+| `POST` | `/api/transactions/import` | Bearer | Upload a CSV (multipart, max 5 MB) |
+| `GET/POST` | `/api/categories` | Bearer | List / create |
+| `GET/PUT/DELETE` | `/api/categories/{id}` | Bearer | Single category |
+| `GET/POST` | `/api/budgets` | Bearer | List (`?month=yyyy-MM`) / create |
+| `PUT/DELETE` | `/api/budgets/{id}` | Bearer | Single budget |
+| `GET/POST` | `/api/recurring` | Bearer | List / create rules |
+| `PUT/DELETE` | `/api/recurring/{id}` | Bearer | Single rule |
+| `POST` | `/api/recurring/run` | Bearer | Generate anything already due |
 | `GET` | `/actuator/health` | — | Liveness |
 
-Transactions are scoped to the authenticated user; one user cannot read or
-modify another's. Categories are currently shared across all users.
+Everything is scoped to the authenticated account. A record belonging to someone
+else returns **404, not 403** — "forbidden" would confirm that the id exists,
+which is enough to enumerate another user's records.
+
+---
+
+## Tests
+
+```bash
+npm test
+```
+
+118 tests: 65 on the backend, 53 on the frontend.
+
+The backend tests drive the application through MockMvc rather than calling
+services directly, because the defects worth guarding against — the password
+encoder wiring, the security filter chain, ownership checks — only exist once
+the whole stack is assembled. They run against in-memory H2 and need no
+database.
 
 ---
 
@@ -109,13 +160,18 @@ modify another's. Categories are currently shared across all users.
 Java's NIO selector opens an internal self-pipe over an AF_UNIX socket inside
 `java.io.tmpdir`. Some Windows machines refuse that bind inside
 `%LOCALAPPDATA%\Temp` — usually endpoint protection or Controlled Folder
-Access — and then *no* Java server can start. `scripts/run-backend.mjs` works
-around it by pointing `jdk.net.unixdomain.tmpdir` at the repo-local `.tmp/`.
-Running the jar by hand needs the same flag:
+Access — and then *no* Java server can start, not just this one.
+`scripts/run-backend.mjs` works around it by pointing
+`jdk.net.unixdomain.tmpdir` at a directory beside the application. Running the
+jar by hand needs the same flag:
 
 ```bash
-java -Djdk.net.unixdomain.tmpdir=./.tmp -jar apps/backend/target/*.jar
+java -Djdk.net.unixdomain.tmpdir=.tmp -jar apps/backend/target/expense_tracker_backend-0.0.1-SNAPSHOT.jar
 ```
 
 **Maven picks the wrong Java.** `scripts/run-backend.mjs` searches for a JDK 17+
 and sets `JAVA_HOME` itself, so an old JRE earlier on `PATH` does not matter.
+
+**Port 4300 or 8081 already in use.** Change the frontend port in
+`apps/frontend/angular.json` (`serve.options.port`) and the backend's with the
+`PORT` environment variable. Update `apps/frontend/proxy.conf.json` to match.
