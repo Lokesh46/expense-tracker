@@ -15,6 +15,9 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lokesh_codes.expense_tracker_backend.entity.Role;
+import com.lokesh_codes.expense_tracker_backend.entity.User;
+import com.lokesh_codes.expense_tracker_backend.repository.ActivityLogRepository;
 import com.lokesh_codes.expense_tracker_backend.repository.BudgetRepository;
 import com.lokesh_codes.expense_tracker_backend.repository.CategoryRepository;
 import com.lokesh_codes.expense_tracker_backend.repository.RecurringTransactionRepository;
@@ -51,7 +54,9 @@ abstract class ApiTestBase {
     @Autowired
     private CategoryRepository categories;
     @Autowired
-    private UserRepository users;
+    protected UserRepository users;
+    @Autowired
+    protected ActivityLogRepository activityLog;
 
     /**
      * The Spring context is shared across the class, so each test starts from an
@@ -67,6 +72,9 @@ abstract class ApiTestBase {
         budgets.deleteAllInBatch();
         categories.deleteAllInBatch();
         users.deleteAllInBatch();
+        // Deliberately outlives its user in production, so it has to be cleared
+        // explicitly here or a sign-in count would carry across tests.
+        activityLog.deleteAllInBatch();
     }
 
     // ------------------------------------------------------------------ auth
@@ -79,6 +87,36 @@ abstract class ApiTestBase {
                 .andExpect(status().isCreated());
 
         return tokenFor(username);
+    }
+
+    /**
+     * Registers an account, promotes it, and returns an administrator's token.
+     *
+     * <p>Promoted through the repository rather than the API, because the API
+     * requires an existing administrator and the first one cannot come from
+     * anywhere. This is what {@code ADMIN_USERNAME} does at startup.
+     */
+    protected String signUpAdmin(String username) throws Exception {
+        signUp(username);
+
+        User user = userNamed(username);
+        user.setRole(Role.ADMIN);
+        users.save(user);
+
+        // Re-issued so the token's own scope claim matches the stored role. The
+        // earlier one would work too — AccountStateFilter rebuilds authorities from
+        // the database on every request — but a token that disagrees with the
+        // database is a confusing thing to debug a failing test against.
+        return tokenFor(username);
+    }
+
+    protected User userNamed(String username) {
+        return users.findByUsername(username)
+                .orElseThrow(() -> new AssertionError("No account named '" + username + "'"));
+    }
+
+    protected int userIdOf(String username) {
+        return userNamed(username).getId();
     }
 
     protected String tokenFor(String username) throws Exception {

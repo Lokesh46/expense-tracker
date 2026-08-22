@@ -17,6 +17,10 @@ public interface TransactionRepository
 
     List<Transaction> findByUser_Id(Integer userId);
 
+    long countByUser_Id(Integer userId);
+
+    void deleteByUser_Id(Integer userId);
+
     Optional<Transaction> findByIdAndUser_Id(Integer id, Integer userId);
 
     /**

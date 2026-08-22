@@ -9,10 +9,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
@@ -53,6 +56,35 @@ public class GlobalExceptionHandler {
         var payload = base(HttpStatus.BAD_REQUEST, "Some fields need attention");
         payload.put("fields", fields);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(payload);
+    }
+
+    /**
+     * A method-security denial, from a {@code @PreAuthorize} inside a service.
+     *
+     * <p>Denials raised in the filter chain are handled by Spring Security's own
+     * entry point, but one raised past it propagates out of the controller and,
+     * without this, is reported as a 500 — turning "you are not an administrator"
+     * into "the server is broken".
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Map<String, Object>> handleAccessDenied(AccessDeniedException e) {
+        return body(HttpStatus.FORBIDDEN, "You do not have permission to do that.");
+    }
+
+    /**
+     * A body Jackson could not read: malformed JSON, or a value outside an enum
+     * such as a role of "SUPERUSER". Reported as the client error it is; it used
+     * to surface as a 500.
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, Object>> handleUnreadable(HttpMessageNotReadableException e) {
+        return body(HttpStatus.BAD_REQUEST, "That request body could not be read. Check the values sent.");
+    }
+
+    /** A path or query value of the wrong type, e.g. {@code /users/abc}. */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<Map<String, Object>> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
+        return body(HttpStatus.BAD_REQUEST, "'" + e.getName() + "' is not a valid value.");
     }
 
     @ExceptionHandler(ResponseStatusException.class)

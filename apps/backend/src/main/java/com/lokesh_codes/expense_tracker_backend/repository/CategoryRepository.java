@@ -11,6 +11,10 @@ public interface CategoryRepository extends JpaRepository<Category, Integer> {
 
     List<Category> findByUser_IdOrderByNameAsc(Integer userId);
 
+    long countByUser_Id(Integer userId);
+
+    void deleteByUser_Id(Integer userId);
+
     Optional<Category> findByIdAndUser_Id(Integer id, Integer userId);
 
     boolean existsByUser_IdAndNameIgnoreCase(Integer userId, String name);

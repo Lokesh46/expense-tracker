@@ -124,7 +124,7 @@ class AuthenticationApiTest extends ApiTestBase {
         String claims = new String(java.util.Base64.getUrlDecoder()
                 .decode(token.split("\\.")[1]));
 
-        assertThat(claims).contains("ROLE_USER");
+        assertThat(claims).contains("ROLE_MEMBER");
         assertThat(claims).doesNotContain("ROLE_ADMIN");
     }
 

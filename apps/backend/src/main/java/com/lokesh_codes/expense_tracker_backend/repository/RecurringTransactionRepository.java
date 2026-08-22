@@ -12,6 +12,10 @@ public interface RecurringTransactionRepository extends JpaRepository<RecurringT
 
     List<RecurringTransaction> findByUser_Id(Integer userId);
 
+    long countByUser_Id(Integer userId);
+
+    void deleteByUser_Id(Integer userId);
+
     Optional<RecurringTransaction> findByIdAndUser_Id(Integer id, Integer userId);
 
     /** Rules that are due; used by the generator and on-demand catch-up. */

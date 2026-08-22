@@ -1,14 +1,15 @@
 package com.lokesh_codes.expense_tracker_backend.security;
 
+import java.util.Optional;
 
-import com.lokesh_codes.expense_tracker_backend.entity.User;
-import com.lokesh_codes.expense_tracker_backend.repository.UserRepository;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
-import java.util.Optional;
+import com.lokesh_codes.expense_tracker_backend.entity.Role;
+import com.lokesh_codes.expense_tracker_backend.entity.User;
+import com.lokesh_codes.expense_tracker_backend.repository.UserRepository;
 
 @Service
 public class JpaUserDetailsService implements UserDetailsService {
@@ -28,16 +29,23 @@ public class JpaUserDetailsService implements UserDetailsService {
         }
 
         User user = userOptional.get();
+        Role role = user.getRole() == null ? Role.MEMBER : user.getRole();
 
         // The stored value is a BCrypt hash written by the registration endpoint,
         // so it is handed over untouched and verified by the configured
         // PasswordEncoder. Prefixing it with "{noop}" (as this once did) told
         // Spring Security to treat the hash as plaintext, which made every
         // login fail.
+        //
+        // accountLocked and disabled are reported here rather than checked in the
+        // controller, so Spring's own pre-authentication checks raise
+        // LockedException and DisabledException. Those are distinguishable from a
+        // wrong password, which is what lets the sign-in endpoint explain itself.
         return org.springframework.security.core.userdetails.User
                 .withUsername(user.getUsername())
                 .password(user.getPassword())
-                .roles(user.getRole() == null ? "USER" : user.getRole())
+                .roles(role.name())
+                .accountLocked(user.isLocked())
                 .disabled(!user.isActive())
                 .build();
     }

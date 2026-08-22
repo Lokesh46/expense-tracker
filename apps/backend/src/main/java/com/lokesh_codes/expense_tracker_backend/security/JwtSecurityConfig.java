@@ -20,6 +20,7 @@ import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenAuthenticationEntryPoint;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.oauth2.server.resource.web.access.BearerTokenAccessDeniedHandler;
 import org.springframework.security.web.SecurityFilterChain;
 
@@ -35,7 +36,8 @@ import com.nimbusds.jose.proc.SecurityContext;
 public class JwtSecurityConfig {
 
         @Bean
-        public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception {
+        public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity,
+                        AccountStateFilter accountStateFilter) throws Exception {
                 return httpSecurity
                                 .csrf(AbstractHttpConfigurer::disable) // (1)
                                 .sessionManagement(
@@ -50,9 +52,18 @@ public class JwtSecurityConfig {
                                                                 .permitAll()
                                                                 .requestMatchers(HttpMethod.OPTIONS, "/**")
                                                                 .permitAll()
+                                                                // Administration is gated here as well as on
+                                                                // every service method. A path rule alone is
+                                                                // one typo away from being open, and typos in
+                                                                // path rules do not fail loudly.
+                                                                .requestMatchers("/api/admin/**")
+                                                                .hasRole("ADMIN")
                                                                 .anyRequest()
                                                                 .authenticated()) // (3)
                                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(withDefaults())) // (4)
+                                // Runs once the token has been validated, and checks it against
+                                // the account it names. See AccountStateFilter.
+                                .addFilterAfter(accountStateFilter, BearerTokenAuthenticationFilter.class)
                                 .exceptionHandling(
                                                 (ex) -> ex.authenticationEntryPoint(
                                                                 new BearerTokenAuthenticationEntryPoint())
@@ -74,17 +85,6 @@ public class JwtSecurityConfig {
                 authenticationProvider.setPasswordEncoder(passwordEncoder);
                 return new ProviderManager(authenticationProvider);
         }
-
-        // @Bean
-        // public UserDetailsService userDetailsService() {
-        // UserDetails user = User.withUsername("test")
-        // .password("{noop}test")
-        // .authorities("read")
-        // .roles("USER")
-        // .build();
-        //
-        // return new InMemoryUserDetailsManager(user);
-        // }
 
         @Bean
         public JWKSource<SecurityContext> jwkSource(RSAKey rsaKey) {

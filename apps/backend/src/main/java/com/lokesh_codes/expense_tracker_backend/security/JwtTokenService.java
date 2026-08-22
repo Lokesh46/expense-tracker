@@ -15,6 +15,9 @@ import java.util.stream.Collectors;
 @Service
 public class JwtTokenService {
 
+    /** Millisecond-precision companion to the standard, second-precision "iat". */
+    public static final String ISSUED_AT_MILLIS = "iat_ms";
+
     private final JwtEncoder jwtEncoder;
     private final long ttlMinutes;
 
@@ -40,6 +43,12 @@ public class JwtTokenService {
                 .expiresAt(issuedAt.plus(ttlMinutes, ChronoUnit.MINUTES))
                 .subject(authentication.getName())
                 .claim("scope", scope)
+                // The standard "iat" claim is whole seconds, which is too coarse to
+                // decide whether this token was issued before or after a revocation
+                // that happened in the same second. Changing a password revokes and
+                // then immediately reissues, so that second is exactly the one that
+                // matters. See AccountStateFilter.
+                .claim(ISSUED_AT_MILLIS, issuedAt.toEpochMilli())
                 .build();
 
         return this.jwtEncoder
