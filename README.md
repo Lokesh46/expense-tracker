@@ -40,6 +40,7 @@ the browser only ever talks to one origin and CORS stays out of the way.
 ```bash
 npm run dev:api      # backend only
 npm run dev:web      # frontend only
+npm run dev:api:prod # backend against a real database, from apps/backend/.env
 npm run build        # build both
 npm test             # run both test suites
 ```
@@ -78,6 +79,7 @@ apps/
   frontend/    Angular 20 · standalone components · lazy routes · Chart.js
 scripts/
   run-backend.mjs   Locates a JDK and launches Maven with the right flags
+  load-env.mjs      Reads apps/backend/.env for the --prod check
 ```
 
 ## Data and configuration
@@ -104,7 +106,8 @@ and reads everything from the environment:
 | `DATABASE_USERNAME` | |
 | `DATABASE_PASSWORD` | |
 | `FRONTEND_URL` | Allowed browser origins, comma-separated. Patterns such as `http://localhost:[*]` are accepted. |
-| `JWT_KEY_STORE` | Path to the signing key. Point it at a mounted volume — a container filesystem is wiped on redeploy, which would sign everyone out. |
+| `JWT_SIGNING_KEY` | The signing key itself, as a JWK. **Set this in production.** Without it the key is regenerated on every deploy and every signed-in user is silently logged out. |
+| `JWT_KEY_STORE` | Fallback path to a key file, used when `JWT_SIGNING_KEY` is unset. Fine locally; unreliable in a container, whose filesystem is wiped on redeploy. |
 | `PORT` | Defaults to 8081 |
 
 The frontend's production API URL is compiled in, from
@@ -144,7 +147,7 @@ which is enough to enumerate another user's records.
 npm test
 ```
 
-118 tests: 65 on the backend, 53 on the frontend.
+122 tests: 69 on the backend, 53 on the frontend.
 
 The backend tests drive the application through MockMvc rather than calling
 services directly, because the defects worth guarding against — the password
@@ -168,15 +171,28 @@ readable inside a public image. Set them at run time, never at build time.
 
 Use a provider whose free tier persists — Neon, for example. Render's own free
 Postgres expires and is deleted, which is what ended the previous deployment.
+Put the database in the **same region** as the API; a cross-region hop adds
+100-200 ms to every query, and a page makes several.
 
-Neon shows a URL beginning `postgresql://`. Java cannot use that directly; split
-it into the three variables below and prefix the URL with `jdbc:`:
+Neon shows a URL beginning `postgresql://` with the credentials embedded. Java
+cannot use that directly. Add the `jdbc:` prefix, take the credentials out of
+the URL, and keep `?sslmode=require`.
 
+Rather than doing that by hand, fill in the template and let the script check it:
+
+```bash
+cp apps/backend/.env.example apps/backend/.env
+npm run dev:api:prod
 ```
-DATABASE_URL=jdbc:postgresql://ep-xxx.eu-central-1.aws.neon.tech/neondb?sslmode=require
-DATABASE_USERNAME=<user>
-DATABASE_PASSWORD=<password>
-```
+
+`apps/backend/.env` is gitignored. The script refuses to start on the mistakes
+that are otherwise diagnosed from an obscure JDBC error — a missing `jdbc:`
+prefix, credentials left inside the URL, or an unfilled placeholder — and never
+prints the values. It listens on port 8082, so it can run alongside the normal
+dev server.
+
+Once `curl http://localhost:8082/actuator/health` returns `{"status":"UP"}`, the
+same four values go into the hosting provider.
 
 ### 2. API
 

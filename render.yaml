@@ -18,7 +18,7 @@ services:
     # The build context is the repository root, matching the Dockerfile's paths.
     dockerContext: .
     plan: free
-    region: frankfurt
+    region: singapore
     branch: main
     healthCheckPath: /actuator/health
     envVars:

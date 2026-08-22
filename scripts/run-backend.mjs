@@ -20,9 +20,79 @@ import { existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { loadEnvFile, missingKeys } from './load-env.mjs';
+
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const backendDir = join(repoRoot, 'apps', 'backend');
 const isWindows = process.platform === 'win32';
+
+/**
+ * `--prod` runs against the real database using apps/backend/.env, which is
+ * gitignored. This is for checking the production configuration before handing
+ * it to a hosting provider, so a failure can be diagnosed locally rather than
+ * from a deployment log.
+ */
+const useProdProfile = process.argv.includes('--prod');
+
+const REQUIRED_FOR_PROD = [
+  'DATABASE_URL',
+  'DATABASE_USERNAME',
+  'DATABASE_PASSWORD',
+  'FRONTEND_URL',
+];
+
+let extraEnv = {};
+
+if (useProdProfile) {
+  const envPath = join(backendDir, '.env');
+
+  if (!existsSync(envPath)) {
+    console.error(
+      `\nNo ${envPath} found.\n\n` +
+        'Copy the template and fill it in:\n' +
+        '  cp apps/backend/.env.example apps/backend/.env\n\n' +
+        'It is gitignored, so nothing you put there can be committed.\n'
+    );
+    process.exit(1);
+  }
+
+  extraEnv = loadEnvFile(envPath);
+
+  const missing = missingKeys(extraEnv, REQUIRED_FOR_PROD);
+  if (missing.length > 0) {
+    console.error(
+      `\nStill to fill in, in apps/backend/.env:\n` +
+        missing.map((key) => `  - ${key}`).join('\n') +
+        '\n'
+    );
+    process.exit(1);
+  }
+
+  // Caught here because the JDBC driver's own message for this is obscure.
+  if (!extraEnv.DATABASE_URL.startsWith('jdbc:postgresql://')) {
+    console.error(
+      '\nDATABASE_URL must begin with "jdbc:postgresql://".\n' +
+        `  got: ${extraEnv.DATABASE_URL.split('@').pop()}\n\n` +
+        'Providers show a "postgresql://user:password@host/db" URL. Add the\n' +
+        'jdbc: prefix and move the credentials into DATABASE_USERNAME and\n' +
+        'DATABASE_PASSWORD.\n'
+    );
+    process.exit(1);
+  }
+
+  if (extraEnv.DATABASE_URL.includes('@')) {
+    console.error(
+      '\nDATABASE_URL still contains credentials (an "@" before the host).\n' +
+        'Move the user and password into DATABASE_USERNAME and\n' +
+        'DATABASE_PASSWORD and remove "user:password@" from the URL.\n'
+    );
+    process.exit(1);
+  }
+
+  extraEnv.SPRING_PROFILES_ACTIVE = 'prod';
+  // A separate port so this can run alongside the normal dev server.
+  extraEnv.PORT = extraEnv.PORT || '8082';
+}
 
 /** Locates a JDK 17+ so the Maven wrapper cannot fall back to an old JRE. */
 function findJavaHome() {
@@ -110,13 +180,19 @@ const mvnw = join(backendDir, isWindows ? 'mvnw.cmd' : 'mvnw');
 const command = isWindows && mvnw.includes(' ') ? `"${mvnw}"` : mvnw;
 
 console.log(`> JAVA_HOME=${javaHome}`);
+if (useProdProfile) {
+  // The host is echoed to confirm which database is being reached; the
+  // credentials never are.
+  const host = extraEnv.DATABASE_URL.replace('jdbc:postgresql://', '').split('/')[0];
+  console.log(`> profile=prod  db=${host}  port=${extraEnv.PORT}`);
+}
 console.log(`> mvnw ${mode.join(' ')}  (in apps/backend)\n`);
 
 const child = spawn(command, mode, {
   cwd: backendDir,
   stdio: 'inherit',
   shell: true,
-  env: { ...process.env, JAVA_HOME: javaHome },
+  env: { ...process.env, ...extraEnv, JAVA_HOME: javaHome },
 });
 
 child.on('exit', (code) => process.exit(code ?? 1));
