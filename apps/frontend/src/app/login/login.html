@@ -1,0 +1,73 @@
+<section class="page-card login-wrapper">
+  <header class="login-header">
+    <span class="welcome-badge">Sign in</span>
+    <h2>Welcome back, planner</h2>
+    <p class="subtitle">Access your dashboard to manage expenses and budgets.</p>
+  </header>
+
+  <div *ngIf="errorMessage()" class="alert error">{{ errorMessage() }}</div>
+  <div *ngIf="successMessage()" class="alert success">{{ successMessage() }}</div>
+
+  <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" novalidate>
+    <div class="form-field">
+      <label for="username">Username</label>
+      <input
+        id="username"
+        type="text"
+        formControlName="username"
+        autocomplete="username"
+        placeholder="Enter your username"
+        [class.invalid]="showError('username')"
+      />
+      <span *ngIf="showError('username')" class="field-error">
+        {{ showError('username') }}
+      </span>
+    </div>
+
+    <div class="form-field">
+      <label for="password">Password</label>
+      <input
+        id="password"
+        type="password"
+        formControlName="password"
+        autocomplete="current-password"
+        placeholder="Enter your password"
+        [class.invalid]="showError('password')"
+      />
+      <span *ngIf="showError('password')" class="field-error">
+        {{ showError('password') }}
+      </span>
+    </div>
+
+    <div class="form-meta">
+      <label class="remember-me">
+        <input type="checkbox" formControlName="rememberMe" />
+        <span>Remember me</span>
+      </label>
+
+      <a class="help-link" routerLink="/register">Create account</a>
+    </div>
+
+    <button type="submit" class="submit-btn" [disabled]="isSubmitting()">
+      <span *ngIf="!isSubmitting(); else loading">Log in</span>
+    </button>
+    <ng-template #loading>
+      <span class="loading">Signing you in...</span>
+    </ng-template>
+  </form>
+
+  <div class="divider">
+    <span>or</span>
+  </div>
+
+  <div class="alternative-actions">
+    <button type="button" class="ghost-btn">
+      <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" />
+      Continue with Google
+    </button>
+    <p class="signup-copy">
+      Prefer to register later?
+      <a routerLink="/register">Sign up now</a>
+    </p>
+  </div>
+</section>

@@ -1,0 +1,295 @@
+<section class="page-card full-width transactions-wrapper">
+  <header class="transactions-header">
+    <span class="header-badge">Management</span>
+    <h2>Transactions</h2>
+    <p class="subtitle">Track, create, and manage all your expense transactions in one place.</p>
+    <div class="header-actions">
+      <button type="button" class="add-transaction-btn" (click)="showCreateForm.set(true)" title="Add New Transaction">+ Add New Transaction</button>
+    </div>
+  </header>
+
+  <section class="form-section" *ngIf="showCreateForm()">
+    <h3>{{ isEditMode ? 'Edit Transaction' : 'Create New Transaction' }}</h3>
+    <form [formGroup]="transactionForm" (ngSubmit)="isEditMode ? onUpdateSubmit() : onCreateSubmit()">
+      <div class="form-grid">
+        <!-- Amount -->
+        <div class="form-group">
+          <label for="amount">Amount</label>
+          <input
+            id="amount"
+            type="number"
+            formControlName="amount"
+            placeholder="0.00"
+            step="0.01"
+            min="0"
+            class="form-input"
+          />
+          <div class="form-error" *ngIf="transactionForm.get('amount')?.invalid && transactionForm.get('amount')?.touched">
+            <span *ngIf="transactionForm.get('amount')?.errors?.['required']">Amount is required</span>
+            <span *ngIf="transactionForm.get('amount')?.errors?.['min']">Amount must be greater than 0</span>
+          </div>
+        </div>
+
+        <!-- Currency -->
+        <div class="form-group">
+          <label for="currency">Currency</label>
+          <select id="currency" formControlName="currency" class="form-input">
+            <option value="USD">USD</option>
+            <option value="EUR">EUR</option>
+            <option value="GBP">GBP</option>
+            <option value="INR">INR</option>
+            <option value="JPY">JPY</option>
+            <option value="AUD">AUD</option>
+            <option value="CAD">CAD</option>
+          </select>
+        </div>
+
+        <!-- Category -->
+        <div class="form-group">
+          <label for="categoryId">Category</label>
+          <select id="categoryId" formControlName="categoryId" class="form-input">
+            <option value="">Select a category</option>
+            <option *ngFor="let category of categories()" [value]="category.id">
+              {{ category.name }}
+            </option>
+          </select>
+          <div class="form-error" *ngIf="transactionForm.get('categoryId')?.invalid && transactionForm.get('categoryId')?.touched">
+            <span *ngIf="transactionForm.get('categoryId')?.errors?.['required']">Category is required</span>
+          </div>
+        </div>
+
+        <!-- Date -->
+        <div class="form-group">
+          <label for="date">Date</label>
+          <input
+            id="date"
+            type="date"
+            formControlName="date"
+            class="form-input"
+          />
+          <div class="form-error" *ngIf="transactionForm.get('date')?.invalid && transactionForm.get('date')?.touched">
+            <span *ngIf="transactionForm.get('date')?.errors?.['required']">Date is required</span>
+          </div>
+        </div>
+
+        <!-- Payment Method -->
+        <div class="form-group">
+          <label for="paymentMethod">Payment Method</label>
+          <select id="paymentMethod" formControlName="paymentMethod" class="form-input">
+            <option value="">Select payment method</option>
+            <option value="Credit Card">Credit Card</option>
+            <option value="Debit Card">Debit Card</option>
+            <option value="Cash">Cash</option>
+            <option value="UPI">UPI</option>
+            <option value="Others">Others</option>
+          </select>
+          <div class="form-error" *ngIf="transactionForm.get('paymentMethod')?.invalid && transactionForm.get('paymentMethod')?.touched">
+            <span *ngIf="transactionForm.get('paymentMethod')?.errors?.['required']">Payment method is required</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Description -->
+      <div class="form-group">
+        <label for="description">Description</label>
+        <input
+          id="description"
+          type="text"
+          formControlName="description"
+          placeholder="Enter transaction description"
+          class="form-input"
+        />
+        <div class="form-error" *ngIf="transactionForm.get('description')?.invalid && transactionForm.get('description')?.touched">
+          <span *ngIf="transactionForm.get('description')?.errors?.['required']">Description is required</span>
+          <span *ngIf="transactionForm.get('description')?.errors?.['minlength']">Description must be at least 3 characters</span>
+          <span *ngIf="transactionForm.get('description')?.errors?.['maxlength']">Description must not exceed 200 characters</span>
+        </div>
+      </div>
+
+      <!-- Comments -->
+      <div class="form-group">
+        <label for="comments">Comments (Optional)</label>
+        <textarea
+          id="comments"
+          formControlName="comments"
+          placeholder="Add any additional comments"
+          rows="4"
+          class="form-input"
+        ></textarea>
+        <div class="form-error" *ngIf="transactionForm.get('comments')?.invalid && transactionForm.get('comments')?.touched">
+          <span *ngIf="transactionForm.get('comments')?.errors?.['maxlength']">Comments must not exceed 500 characters</span>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button
+          type="submit"
+          [disabled]="isFormLoading() || transactionForm.invalid || isCategoriesLoading()"
+          class="submit-btn"
+        >
+          {{ isFormLoading() ? 'Loading...' : (isEditMode ? 'Update Transaction' : 'Create Transaction') }}
+        </button>
+        <button type="button" (click)="onCancel()" class="cancel-btn" [disabled]="isFormLoading()">
+          Cancel
+        </button>
+      </div>
+    </form>
+  </section>
+
+  <!-- Loading State -->
+  <section class="loading-state" *ngIf="isLoading()">
+    <p>Loading transactions...</p>
+  </section>
+
+  <!-- Filters -->
+  <section class="filters-section" *ngIf="!isLoading()">
+    <form [formGroup]="filterForm" (ngSubmit)="onFilterApply()" class="filters-form">
+      <div class="filters-grid">
+        <div class="filter-group">
+          <label for="filterCategory">Category</label>
+          <select id="filterCategory" formControlName="categoryId" class="form-input">
+            <option value="">All</option>
+            <option *ngFor="let category of categories()" [value]="category.id">{{ category.name }}</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label for="fromDate">From</label>
+          <input id="fromDate" type="date" formControlName="fromDate" class="form-input" />
+        </div>
+
+        <div class="filter-group">
+          <label for="toDate">To</label>
+          <input id="toDate" type="date" formControlName="toDate" class="form-input" />
+        </div>
+
+        <div class="filter-group">
+          <label for="minAmount">Min Amount</label>
+          <input id="minAmount" type="number" formControlName="minAmount" class="form-input" step="0.01" />
+        </div>
+
+        <div class="filter-group">
+          <label for="maxAmount">Max Amount</label>
+          <input id="maxAmount" type="number" formControlName="maxAmount" class="form-input" step="0.01" />
+        </div>
+
+        <div class="filter-group">
+          <label for="paymentMethodFilter">Payment</label>
+          <select id="paymentMethodFilter" formControlName="paymentMethod" class="form-input">
+            <option value="">All</option>
+            <option value="Credit Card">Credit Card</option>
+            <option value="Debit Card">Debit Card</option>
+            <option value="Cash">Cash</option>
+            <option value="UPI">UPI</option>
+            <option value="Others">Others</option>
+          </select>
+        </div>
+
+        <div class="filter-group search-group">
+          <label for="search">Search</label>
+          <input id="search" type="search" formControlName="search" placeholder="Search description or comments" class="form-input" />
+        </div>
+      </div>
+
+      <div class="filter-actions">
+        <button type="submit" class="primary-btn">Apply Filters</button>
+        <button type="button" class="secondary-btn" (click)="onFilterClear()">Clear</button>
+      </div>
+      <!-- sort control moved to table header -->
+    </form>
+  </section>
+
+  <!-- Transactions Table -->
+  <section class="table-section" *ngIf="!isLoading() && transactions().length > 0">
+    <div class="table-header">
+      <h3>Recent Transactions</h3>
+      <div class="table-sort">
+        <label for="sortSelect" class="sort-label">Sort:</label>
+        <select id="sortSelect" #sortSelect class="form-input" [value]="sortBy()" (change)="onSortChange(sortSelect.value)">
+          <option value="newest">Newest</option>
+          <option value="oldest">Oldest</option>
+          <option value="amount_desc">Amount: High → Low</option>
+          <option value="amount_asc">Amount: Low → High</option>
+        </select>
+      </div>
+    </div>
+    <div class="table-wrapper">
+      <table class="transactions-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Description</th>
+            <th>Category</th>
+            <th>Amount</th>
+            <th>Payment Method</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let transaction of paginatedTransactions">
+            <td>{{ transaction.date | date: 'short' }}</td>
+            <td>{{ transaction.description }}</td>
+            <td>
+              <span class="category-badge">{{ getCategoryName(transaction.categoryId) }}</span>
+            </td>
+            <td class="amount-cell">
+              <span class="amount">{{ transaction.currency }} {{ transaction.amount | number: '1.2-2' }}</span>
+            </td>
+            <td>{{ transaction.paymentMethod }}</td>
+            <td class="actions-cell">
+              <button
+                type="button"
+                class="action-btn edit-btn"
+                (click)="onEditClick(transaction)"
+                title="Edit transaction"
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                class="action-btn delete-btn"
+                (click)="onDeleteClick(transaction.id)"
+                title="Delete transaction"
+              >
+                Delete
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="pagination" *ngIf="totalPages > 1">
+      <button
+        type="button"
+        class="pagination-btn"
+        (click)="previousPage()"
+        [disabled]="currentPage() === 1"
+      >
+        Previous
+      </button>
+
+      <div class="pagination-info">
+        Page {{ currentPage() }} of {{ totalPages }}
+      </div>
+
+      <button
+        type="button"
+        class="pagination-btn"
+        (click)="nextPage()"
+        [disabled]="currentPage() === totalPages"
+      >
+        Next
+      </button>
+    </div>
+  </section>
+
+  <!-- Empty State -->
+  <section class="empty-state" *ngIf="!isLoading() && transactions().length === 0">
+    <p>No transactions found. Create your first transaction to get started.</p>
+    <button type="button" class="primary-btn" (click)="showCreateForm.set(true)">
+      Add First Transaction
+    </button>
+  </section>
+</section>

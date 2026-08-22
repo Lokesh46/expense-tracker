@@ -1,0 +1,101 @@
+<section class="page-card full-width categories-wrapper">
+  <header class="categories-header">
+    <span class="header-badge">Management</span>
+    <h2>Categories</h2>
+    <p class="subtitle">Create and manage your expense categories to better organize your spending.</p>
+  </header>
+
+  <!-- Create/Edit Form Section -->
+  <section class="form-section" *ngIf="!showCreateForm()">
+    <button type="button" class="primary-btn" (click)="showCreateForm.set(true)">
+      + Create New Category
+    </button>
+  </section>
+
+  <section class="form-section" *ngIf="showCreateForm()">
+    <h3>{{ isEditMode ? 'Edit Category' : 'Create New Category' }}</h3>
+    <form [formGroup]="categoryForm" (ngSubmit)="isEditMode ? onUpdateSubmit() : onCreateSubmit()">
+      <div class="form-group">
+        <label for="categoryName">Category Name</label>
+        <input
+          id="categoryName"
+          type="text"
+          formControlName="name"
+          placeholder="Enter category name (e.g., Groceries, Utilities)"
+          class="form-input"
+        />
+        <div class="form-error" *ngIf="categoryForm.get('name')?.invalid && categoryForm.get('name')?.touched">
+          <span *ngIf="categoryForm.get('name')?.errors?.['required']">Category name is required</span>
+          <span *ngIf="categoryForm.get('name')?.errors?.['minlength']">Name must be at least 3 characters</span>
+          <span *ngIf="categoryForm.get('name')?.errors?.['maxlength']">Name must not exceed 50 characters</span>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button
+          type="submit"
+          [disabled]="isFormLoading() || categoryForm.invalid"
+          class="submit-btn"
+        >
+          {{ isFormLoading() ? 'Loading...' : (isEditMode ? 'Update Category' : 'Create Category') }}
+        </button>
+        <button type="button" (click)="onCancel()" class="cancel-btn" [disabled]="isFormLoading()">
+          Cancel
+        </button>
+      </div>
+    </form>
+  </section>
+
+  <!-- Loading State -->
+  <section class="loading-state" *ngIf="isLoading()">
+    <p>Loading categories...</p>
+  </section>
+
+  <!-- Categories Table -->
+  <section class="table-section" *ngIf="!isLoading() && categories().length > 0">
+    <h3>Existing Categories</h3>
+    <div class="table-wrapper">
+      <table class="categories-table">
+        <thead>
+          <tr>
+            <th>Category Name</th>
+            <th>Created At</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let category of categories()">
+            <td>{{ category.name }}</td>
+            <td>{{ category.createdAt ? (category.createdAt | date: 'short') : 'N/A' }}</td>
+            <td class="actions-cell">
+              <button
+                type="button"
+                class="action-btn edit-btn"
+                (click)="onEditClick(category)"
+                title="Edit category"
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                class="action-btn delete-btn"
+                (click)="onDeleteClick(category.id)"
+                title="Delete category"
+              >
+                Delete
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Empty State -->
+  <section class="empty-state" *ngIf="!isLoading() && categories().length === 0">
+    <p>No categories found. Create your first category to get started.</p>
+    <button type="button" class="primary-btn" (click)="showCreateForm.set(true)">
+      Create First Category
+    </button>
+  </section>
+</section>

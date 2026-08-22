@@ -1,0 +1,26 @@
+<div class="notifications-container">
+  <div
+    *ngFor="let notification of notifications"
+    class="notification"
+    [ngClass]="'notification-' + notification.type"
+    role="alert"
+  >
+    <div class="notification-content">
+      <span class="notification-icon">
+        <span *ngIf="notification.type === 'success'">✓</span>
+        <span *ngIf="notification.type === 'error'">✕</span>
+        <span *ngIf="notification.type === 'warning'">!</span>
+        <span *ngIf="notification.type === 'info'">i</span>
+      </span>
+      <span class="notification-message">{{ notification.message }}</span>
+    </div>
+    <button
+      type="button"
+      class="notification-close"
+      (click)="closeNotification(notification.id)"
+      aria-label="Close notification"
+    >
+      ×
+    </button>
+  </div>
+</div>

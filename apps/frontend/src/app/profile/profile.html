@@ -1,0 +1,68 @@
+<section class="page-card profile-wrapper">
+  <header class="profile-header">
+    <span class="welcome-badge">Profile</span>
+    <h2>Personal preferences</h2>
+    <p class="subtitle">
+      Update how we talk to you, manage currencies, and tailor reminders around your routine.
+    </p>
+  </header>
+
+  <form [formGroup]="profileForm" (ngSubmit)="onSubmit()" novalidate>
+    <section class="form-grid">
+      <div class="field">
+        <label for="fullName">Full name</label>
+        <input id="fullName" type="text" formControlName="fullName" placeholder="Your name" />
+      </div>
+
+      <div class="field">
+        <label for="email">Email</label>
+        <input id="email" type="email" formControlName="email" placeholder="you@example.com" />
+      </div>
+
+      <div class="field">
+        <label for="currency">Preferred currency</label>
+        <select id="currency" formControlName="currency">
+          <option value="INR">Indian Rupee (₹)</option>
+          <option value="USD">US Dollar ($)</option>
+          <option value="EUR">Euro (€)</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="reminderDay">Reminder day</label>
+        <input
+          id="reminderDay"
+          type="number"
+          formControlName="reminderDay"
+          min="1"
+          max="28"
+          placeholder="5"
+        />
+        <span class="helper">Choose when monthly summaries hit your inbox (1-28).</span>
+      </div>
+    </section>
+
+    <section class="notifications" formGroupName="notifications">
+      <h3>Notifications</h3>
+      <label>
+        <input type="checkbox" formControlName="email" />
+        Email alerts for new expenses and category limits
+      </label>
+      <label>
+        <input type="checkbox" formControlName="push" />
+        Push notifications on mobile (coming soon)
+      </label>
+      <label>
+        <input type="checkbox" formControlName="monthlyDigest" />
+        Monthly digest with trends and highlights
+      </label>
+    </section>
+
+    <div class="actions">
+      <button type="submit" [disabled]="isSaving()" class="primary">Save changes</button>
+      <button type="button" (click)="resetPreferences()" class="ghost">Reset</button>
+    </div>
+
+    <p *ngIf="saveMessage()" class="status">{{ saveMessage() }}</p>
+  </form>
+</section>
