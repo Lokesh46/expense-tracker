@@ -45,3 +45,22 @@ services:
       # locally and copy apps/backend/data/jwt-signing-key.json verbatim.
       - key: JWT_SIGNING_KEY
         sync: false
+
+      # The username to promote to administrator.
+      #
+      # A fresh deployment has no administrator and no way to appoint one, since
+      # only an administrator can promote anybody. This is the way in: set it to
+      # the username you are about to register, and that account is an
+      # administrator the moment it is created. It also works the other way round
+      # -- an account that already exists is promoted on the next start.
+      # Idempotent, so it can be left set.
+      #
+      # Whoever holds that username gets the role, so set it shortly before
+      # registering rather than leaving a guessable name configured against an
+      # empty database.
+      #
+      # Not a secret, but still `sync: false` rather than a value here: naming the
+      # administrator in a public repository tells anyone reading it which single
+      # account is worth guessing a password for.
+      - key: ADMIN_USERNAME
+        sync: false

@@ -63,11 +63,54 @@ npm test             # run both test suites
   commas, escaped quotes, several date layouts, thousands separators and
   parenthesised negatives, and reports bad rows individually instead of
   rejecting a whole statement over one line.
+- **Users and roles** — two roles, admin and member. An admin manages accounts:
+  who exists, what they may do, and what they have been doing. It grants no sight
+  of anyone's money — see below.
+- **Activity log** — sign-ins, failed attempts, lockouts and account changes, with
+  the address and client they came from. Searchable, filterable and exportable.
+  Members see their own history without needing an admin to look for them.
+- **Lockout** — five consecutive wrong passwords locks an account for fifteen
+  minutes. It clears itself, or an admin can clear it early.
 - **Light and dark themes** — both measured to clear WCAG AA contrast.
 
 Amounts are formatted in the currency they were recorded in. Where a month mixes
 currencies, the overview says so rather than presenting the sum of unlike
 amounts as a total.
+
+### What an admin can and cannot see
+
+An admin sees accounts: usernames, emails, roles, status, sign-in history, and
+**counts** — "142 transactions", "11 categories". They cannot open any of it.
+No endpoint under `/api/admin` returns another account's transactions, budgets or
+categories, and the DTOs have nowhere to put them even by accident. Every
+ownership check in the application stays unconditional on role, which is why
+`CurrentUserService` is still the only way those services resolve a user.
+
+The activity log follows the same rule. It records security-relevant events and
+account changes; ordinary use — recording an expense, opening a page — is never
+logged. A log of what everyone did all day would be exactly the back door the
+rest of this design avoids.
+
+A member's ledger is private from you too. That is deliberate, and it is tested:
+`AdminUserApiTest` asserts that an admin's own transaction list stays empty while
+a member has rows, that a member's transaction fetched by id returns 404, and
+that the user-detail response carries the counts but none of the descriptions or
+amounts behind them.
+
+### Roles taking effect
+
+A JWT is a statement about the past: it says what someone could do when they
+signed in, and keeps saying so until it expires. Left alone, that makes a user
+management screen advisory — suspending an account or demoting an admin would
+take effect up to ninety minutes later, whenever their token happened to run out.
+
+So `AccountStateFilter` re-checks every authenticated request against the
+database: the account still exists, is not suspended, is not locked, and the
+token was issued after the account's last revocation. Authorities are rebuilt
+from the stored role rather than read from the token, so a promotion or demotion
+applies to the very next request. It costs one lookup on an indexed unique column
+per request — a real cost, accepted knowingly, because most requests already load
+the same row.
 
 ---
 
@@ -109,7 +152,41 @@ and reads everything from the environment:
 | `FRONTEND_URL` | Allowed browser origins, comma-separated. Patterns such as `http://localhost:[*]` are accepted. |
 | `JWT_SIGNING_KEY` | The signing key itself, as a JWK. **Set this in production.** Without it the key is regenerated on every deploy and every signed-in user is silently logged out. |
 | `JWT_KEY_STORE` | Fallback path to a key file, used when `JWT_SIGNING_KEY` is unset. Fine locally; unreliable in a container, whose filesystem is wiped on redeploy. |
+| `ADMIN_USERNAME` | A username to promote to admin on startup. See below. |
+| `MAX_FAILED_ATTEMPTS` | Failed sign-ins before lockout. Defaults to 5. |
+| `LOCKOUT_MINUTES` | How long a lockout lasts. Defaults to 15; 0 disables locking. |
+| `ACTIVITY_RETENTION_DAYS` | How long audit entries are kept. Defaults to 180; 0 keeps everything. |
 | `PORT` | Defaults to 8081 |
+
+### The first administrator
+
+A fresh database has no admin and no way to appoint one, since only an admin can
+promote anybody. `ADMIN_USERNAME` is the way in:
+
+1. Set `ADMIN_USERNAME` to the username you are about to use.
+2. Register it through the UI. It is an admin the moment it is created — sign in
+   and the admin screens are there.
+
+The promotion is applied at registration *and* at startup, so it also works the
+other way round: if the account already exists when you set the variable, the next
+restart promotes it. That path additionally revokes its sessions, because a token
+issued a moment earlier still claims to be a member.
+
+Everyone else who registers is a member. The role in the request body is ignored —
+only `ADMIN_USERNAME` can raise it, and that is set by whoever runs the
+deployment, not by anything in the request. There is a test for both halves.
+
+The promotion is written to the activity log with `system` as the actor, and it is
+idempotent, so the variable can be left set without collecting a promotion per
+deploy.
+
+Worth being plain about the exposure: **whoever holds that username gets the
+role.** If a stranger registers it before you do, the promotion lands on them. So
+set it shortly before registering rather than leaving a guessable name configured
+against an empty database indefinitely. That is also why it is declared
+`sync: false` in `render.yaml` rather than written there in the open — naming the
+administrator in a public repository tells anyone reading it which single account
+is worth going after.
 
 The frontend's production API URL is compiled in, from
 `apps/frontend/src/environments/environment.prod.ts`.
@@ -134,11 +211,45 @@ The frontend's production API URL is compiled in, from
 | `GET/POST` | `/api/recurring` | Bearer | List / create rules |
 | `PUT/DELETE` | `/api/recurring/{id}` | Bearer | Single rule |
 | `POST` | `/api/recurring/run` | Bearer | Generate anything already due |
+| `GET` | `/api/account/me` | Bearer | Your own account and role |
+| `PUT` | `/api/account/email` | Bearer | Change your email (empty clears it) |
+| `POST` | `/api/account/password` | Bearer | Change your password; ends every session |
+| `GET` | `/api/account/activity` | Bearer | Your own sign-in history |
+| `GET` | `/api/admin/users` | Admin | Search: `page`, `size`, `sort`, `search`, `role`, `status` |
+| `POST` | `/api/admin/users` | Admin | Create an account, role included |
+| `GET` | `/api/admin/users/stats` | Admin | Counts for the overview |
+| `GET` | `/api/admin/users/{id}` | Admin | One account, with counts and recent activity |
+| `PATCH` | `/api/admin/users/{id}` | Admin | Change email, role or status. Omitted fields are left alone |
+| `POST` | `/api/admin/users/{id}/password` | Admin | Set a password; ends every session |
+| `POST` | `/api/admin/users/{id}/unlock` | Admin | Clear a lockout early |
+| `POST` | `/api/admin/users/{id}/revoke-sessions` | Admin | Sign out everywhere, password unchanged |
+| `DELETE` | `/api/admin/users/{id}` | Admin | Delete the account and everything it owns |
+| `GET` | `/api/admin/activity` | Admin | Search: `username`, `action`, `from`, `to`, `adverseOnly` |
+| `GET` | `/api/admin/activity/export` | Admin | CSV of the same, capped at 10,000 rows |
 | `GET` | `/actuator/health` | — | Liveness |
 
-Everything is scoped to the authenticated account. A record belonging to someone
-else returns **404, not 403** — "forbidden" would confirm that the id exists,
-which is enough to enumerate another user's records.
+Everything is scoped to the authenticated account, whatever its role. A record
+belonging to someone else returns **404, not 403** — "forbidden" would confirm
+that the id exists, which is enough to enumerate another user's records.
+
+The admin routes are gated twice: by the path rule in `JwtSecurityConfig`, and
+again by `@PreAuthorize` on every method of `UserAdminService`. The duplication is
+deliberate — a path rule is one typo away from being open, and typos in path rules
+produce no error.
+
+Some deliberate status codes:
+
+| Code | When |
+|---|---|
+| `401` | No token, or a token whose account is gone, suspended, locked or revoked |
+| `403` | Signed in but not an admin — or a suspended account trying to sign in |
+| `409` | A guard refused: last remaining admin, acting on yourself, wrong current password |
+| `423` | Locked out after too many failed attempts, with the remaining time |
+
+A guard refusal is a `409` rather than a `400` because nothing about the request
+is malformed; it is the state of the system that forbids it. And a wrong current
+password when changing your own is a `409`, not a `401`: the request *is*
+authenticated, and a `401` would make the client throw away a valid token.
 
 ---
 
@@ -148,7 +259,7 @@ which is enough to enumerate another user's records.
 npm test
 ```
 
-122 tests: 69 on the backend, 53 on the frontend.
+214 tests: 131 on the backend, 83 on the frontend.
 
 The backend tests drive the application through MockMvc rather than calling
 services directly, because the defects worth guarding against — the password
