@@ -1,0 +1,60 @@
+# Keeps the free-tier API warm during waking hours.
+#
+# Render's free plan spins an instance down after ~15 minutes of inactivity, and
+# waking it takes around 50 seconds -- long enough that the app looks broken
+# rather than slow. A periodic request avoids that.
+#
+# Deliberately *not* 24/7. Free instances get 750 hours a month and a month is
+# about 730, so round-the-clock pinging would consume the entire allowance and
+# leave nothing for anything else. Waking hours only uses roughly 540.
+#
+# Hitting /actuator/health also keeps the Neon database warm, since its free
+# tier suspends compute after a few minutes idle too.
+name: Keep API warm
+
+on:
+  schedule:
+    # Every 10 minutes, 01:00-18:59 UTC = 06:30-00:29 IST.
+    # GitHub does not guarantee punctuality: scheduled runs are queued at low
+    # priority and can be delayed by 15 minutes or more when Actions is busy,
+    # so the occasional cold start will still slip through.
+    - cron: '*/10 1-18 * * *'
+  workflow_dispatch:
+
+# If a previous run is somehow still going, the newer one matters more.
+concurrency:
+  group: keep-alive
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Wake the API
+        run: |
+          URL="https://expense-tracker-api-8d97.onrender.com/actuator/health"
+
+          # A cold start can take ~50s, and the first attempt is the one that
+          # pays for it, so allow generous time and retry twice.
+          for attempt in 1 2 3; do
+            code=$(curl --silent --show-error --location \
+                        --max-time 90 --output /tmp/body.json \
+                        --write-out '%{http_code}' "$URL" || echo "000")
+
+            if [ "$code" = "200" ]; then
+              echo "awake (attempt $attempt): $(cat /tmp/body.json)"
+              exit 0
+            fi
+
+            echo "attempt $attempt returned $code"
+            sleep 15
+          done
+
+          # A warm-up failing is not worth a red repository badge -- the service
+          # may legitimately be redeploying. Report it and pass.
+          echo "::warning::API did not respond after 3 attempts. It may be mid-deploy."

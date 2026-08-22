@@ -238,6 +238,30 @@ apiBaseUrl: 'https://expense-tracker-api.onrender.com',
 Then set `FRONTEND_URL` on Render to the Vercel origin, or the browser is
 refused by CORS with a bare 403 and no explanation.
 
+### Keeping it warm
+
+The free plan spins the instance down after about 15 minutes of inactivity, and
+waking it takes roughly 50 seconds -- long enough that the app looks broken
+rather than slow.
+
+`.github/workflows/keep-alive.yml` pings `/actuator/health` every 10 minutes
+between 06:30 and 00:30 IST. Waking hours only, on purpose: free instances get
+750 hours a month and a month is about 730, so pinging around the clock would
+consume the whole allowance. Waking hours costs roughly 540 and leaves headroom.
+The same request keeps the Neon database warm, since its compute also suspends
+when idle.
+
+Two honest limitations:
+
+- GitHub queues scheduled workflows at low priority and can delay them by 15
+  minutes or more, so an occasional cold start still gets through.
+- GitHub disables scheduled workflows in repositories with no activity for 60
+  days. If the app suddenly feels slow again, check the Actions tab first.
+
+If cold starts stop being acceptable, the options are a host that does not sleep
+(Fly.io wakes in a few seconds; an Oracle Cloud always-free VM does not sleep at
+all) or Render's paid plan.
+
 ### Checking it worked
 
 ```bash
