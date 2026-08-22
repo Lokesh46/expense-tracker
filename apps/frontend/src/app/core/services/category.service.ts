@@ -24,7 +24,7 @@ export class CategoryService {
     );
   }
 
-  getCategoryById(id: string): Observable<Category> {
+  getCategoryById(id: number): Observable<Category> {
     return this.http.get<Category>(`${this.baseUrl}/api/categories/${id}`);
   }
 
@@ -41,7 +41,7 @@ export class CategoryService {
     );
   }
 
-  updateCategory(id: string, payload: UpdateCategoryRequest): Observable<Category> {
+  updateCategory(id: number, payload: UpdateCategoryRequest): Observable<Category> {
     return this.http.put<Category>(`${this.baseUrl}/api/categories/${id}`, payload).pipe(
       tap((category) => {
         const currentCategories = this.categoriesSubject.value;
@@ -57,7 +57,7 @@ export class CategoryService {
     );
   }
 
-  deleteCategory(id: string): Observable<void> {
+  deleteCategory(id: number): Observable<void> {
     return this.http.delete<void>(`${this.baseUrl}/api/categories/${id}`).pipe(
       tap(() => {
         const currentCategories = this.categoriesSubject.value.filter((c) => c.id !== id);

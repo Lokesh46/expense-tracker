@@ -1,3 +1,5 @@
+import { environment } from '../../../environments/environment';
+
 export const API_CONFIG = {
-  baseUrl: 'https://expense-tracker-backend-wvri.onrender.com'
+  baseUrl: environment.apiBaseUrl,
 } as const;

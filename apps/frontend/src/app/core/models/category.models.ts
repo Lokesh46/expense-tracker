@@ -1,8 +1,7 @@
+/** Mirrors CategoryDTO on the backend, where the id is a Java Integer. */
 export interface Category {
-  id: string;
+  id: number;
   name: string;
-  createdAt?: string;
-  updatedAt?: string;
 }
 
 export interface CreateCategoryRequest {

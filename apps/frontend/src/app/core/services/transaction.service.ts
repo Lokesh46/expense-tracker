@@ -24,7 +24,7 @@ export class TransactionService {
     );
   }
 
-  getTransactionById(id: string): Observable<Transaction> {
+  getTransactionById(id: number): Observable<Transaction> {
     return this.http.get<Transaction>(`${this.baseUrl}/api/transactions/${id}`);
   }
 
@@ -37,7 +37,7 @@ export class TransactionService {
     );
   }
 
-  updateTransaction(id: string, payload: UpdateTransactionRequest): Observable<Transaction> {
+  updateTransaction(id: number, payload: UpdateTransactionRequest): Observable<Transaction> {
     return this.http.put<Transaction>(`${this.baseUrl}/api/transactions/${id}`, payload).pipe(
       tap((transaction) => {
         const currentTransactions = this.transactionsSubject.value;
@@ -50,7 +50,7 @@ export class TransactionService {
     );
   }
 
-  deleteTransaction(id: string): Observable<void> {
+  deleteTransaction(id: number): Observable<void> {
     return this.http.delete<void>(`${this.baseUrl}/api/transactions/${id}`).pipe(
       tap(() => {
         const currentTransactions = this.transactionsSubject.value.filter((t) => t.id !== id);
