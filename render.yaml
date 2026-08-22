@@ -1,0 +1,47 @@
+# =============================================================================
+# Render blueprint for the backend.
+#
+# Every secret is declared with `sync: false`, which means Render prompts for
+# it in the dashboard and never stores it in this file. Nothing sensitive
+# belongs in the repository.
+#
+# The database is deliberately not defined here: Render's free Postgres expires
+# after a trial period and is deleted, which is what killed the previous
+# deployment. Use an external provider with a persistent free tier (Neon) and
+# paste its connection details into the variables below.
+# =============================================================================
+services:
+  - type: web
+    name: expense-tracker-api
+    runtime: docker
+    dockerfilePath: ./apps/backend/Dockerfile
+    # The build context is the repository root, matching the Dockerfile's paths.
+    dockerContext: .
+    plan: free
+    region: frankfurt
+    branch: main
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+
+      # JDBC URL, e.g. jdbc:postgresql://HOST/DB?sslmode=require
+      # Note the jdbc: prefix -- Neon shows a postgresql:// URL, which Java
+      # cannot use as-is.
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_USERNAME
+        sync: false
+      - key: DATABASE_PASSWORD
+        sync: false
+
+      # Exact origin of the deployed frontend, e.g. https://your-app.vercel.app
+      # A trailing slash will not match.
+      - key: FRONTEND_URL
+        sync: false
+
+      # The JWT signing key as a JWK. Without it the key is regenerated on every
+      # deploy and every signed-in user is silently logged out. Run the app once
+      # locally and copy apps/backend/data/jwt-signing-key.json verbatim.
+      - key: JWT_SIGNING_KEY
+        sync: false

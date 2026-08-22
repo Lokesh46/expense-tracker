@@ -154,6 +154,73 @@ database.
 
 ---
 
+## Deploying
+
+Three pieces: Postgres, the API, and the static frontend.
+
+**No secret belongs in this repository.** `render.yaml` declares every sensitive
+variable with `sync: false`, meaning Render prompts for it in the dashboard and
+never reads it from here. The previous deployment passed database credentials as
+Docker *build args*, which bakes them into the image metadata — they ended up
+readable inside a public image. Set them at run time, never at build time.
+
+### 1. Database
+
+Use a provider whose free tier persists — Neon, for example. Render's own free
+Postgres expires and is deleted, which is what ended the previous deployment.
+
+Neon shows a URL beginning `postgresql://`. Java cannot use that directly; split
+it into the three variables below and prefix the URL with `jdbc:`:
+
+```
+DATABASE_URL=jdbc:postgresql://ep-xxx.eu-central-1.aws.neon.tech/neondb?sslmode=require
+DATABASE_USERNAME=<user>
+DATABASE_PASSWORD=<password>
+```
+
+### 2. API
+
+Point Render at this repository; `render.yaml` is picked up automatically. Then
+set the four prompted variables:
+
+| Variable | Value |
+|---|---|
+| `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD` | from the step above |
+| `FRONTEND_URL` | the exact frontend origin, e.g. `https://your-app.vercel.app`, no trailing slash |
+| `JWT_SIGNING_KEY` | see below |
+
+`JWT_SIGNING_KEY` matters more than it looks. A container filesystem is wiped on
+every redeploy, so a file-based key would be regenerated each time and silently
+sign out every user. Run the app locally once, then copy the whole contents of
+`apps/backend/data/jwt-signing-key.json` into the variable.
+
+The free plan sleeps after roughly 15 minutes of inactivity, so the first
+request after a quiet spell takes about 50 seconds. Everything after that is
+normal speed.
+
+### 3. Frontend
+
+Set the API address in `apps/frontend/src/environments/environment.prod.ts`,
+commit, and let Vercel rebuild:
+
+```ts
+apiBaseUrl: 'https://expense-tracker-api.onrender.com',
+```
+
+Then set `FRONTEND_URL` on Render to the Vercel origin, or the browser is
+refused by CORS with a bare 403 and no explanation.
+
+### Checking it worked
+
+```bash
+curl https://YOUR-API.onrender.com/actuator/health
+```
+
+`{"status":"UP"}` means the service started and reached the database. A failure
+here is almost always `DATABASE_URL` missing its `jdbc:` prefix.
+
+---
+
 ## Troubleshooting
 
 **`Unable to establish loopback connection` on startup (Windows).**

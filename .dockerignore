@@ -1,0 +1,11 @@
+# Keeping the build context small also keeps local secrets out of it.
+node_modules/
+dist/
+target/
+.angular/
+.git/
+.tmp/
+apps/backend/data/
+*.log
+.env
+.env.*

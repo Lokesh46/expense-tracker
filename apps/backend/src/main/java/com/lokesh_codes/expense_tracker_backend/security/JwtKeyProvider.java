@@ -26,8 +26,11 @@ import com.nimbusds.jose.jwk.RSAKey;
  * Loading it from a stable location keeps sessions alive across restarts and
  * lets more than one instance verify the same tokens.
  *
- * <p>In production, point {@code app.jwt.key-store} at a mounted secret rather
- * than relying on the container filesystem, which is wiped on redeploy.
+ * <p>Two sources are supported. {@code app.jwt.key} holds the key inline as a
+ * JWK and takes precedence; this is what production should use, because a
+ * container filesystem is wiped on every redeploy and a file-based key would
+ * therefore sign everyone out each time you deploy. {@code app.jwt.key-store}
+ * is the file fallback, which suits local development.
  */
 @Component
 public class JwtKeyProvider {
@@ -35,17 +38,37 @@ public class JwtKeyProvider {
     private static final Logger log = LoggerFactory.getLogger(JwtKeyProvider.class);
 
     private final Path keyStorePath;
+    private final String inlineKey;
 
-    public JwtKeyProvider(@Value("${app.jwt.key-store}") String keyStore) {
+    public JwtKeyProvider(
+            @Value("${app.jwt.key-store}") String keyStore,
+            @Value("${app.jwt.key:}") String inlineKey) {
         this.keyStorePath = Paths.get(keyStore).toAbsolutePath();
+        this.inlineKey = inlineKey;
     }
 
     /**
-     * Returns the persisted signing key, creating and saving one on first run.
+     * Returns the signing key, creating and saving one on first run.
      * A key that cannot be read (corrupt or truncated) is replaced rather than
      * bringing the application down — existing tokens are lost, but only once.
      */
     public RSAKey loadOrCreate() {
+        if (inlineKey != null && !inlineKey.isBlank()) {
+            try {
+                RSAKey configured = RSAKey.parse(inlineKey);
+                log.info("Loaded JWT signing key from configuration");
+                return configured;
+            } catch (ParseException e) {
+                // Falling back to a generated key would quietly sign everyone
+                // out on each deploy, which is far harder to diagnose than a
+                // refusal to start.
+                throw new IllegalStateException(
+                        "app.jwt.key is set but is not a valid JWK. Run the app once locally "
+                                + "and copy the contents of apps/backend/data/jwt-signing-key.json "
+                                + "verbatim, including the surrounding braces.", e);
+            }
+        }
+
         if (Files.exists(keyStorePath)) {
             try {
                 RSAKey existing = RSAKey.parse(Files.readString(keyStorePath));
