@@ -8,10 +8,24 @@
 
 <section class="identity panel rise rise-2">
   <span class="identity-avatar" aria-hidden="true">{{ initial }}</span>
-  <div>
-    <p class="identity-name">{{ username }}</p>
-    <p class="identity-meta text-tertiary">Session valid until {{ expiry() }}</p>
+  <div class="identity-text">
+    <p class="identity-name">
+      {{ username }}
+      @if (account(); as a) {
+        <span class="chip" [class.chip-admin]="a.role === 'ADMIN'">{{ roleLabels[a.role] }}</span>
+      }
+    </p>
+    <p class="identity-meta text-tertiary">
+      @if (account(); as a) {
+        {{ a.email || 'No email set' }} · joined {{ when(a.createdAt, 'unknown') }} ·
+      }
+      session valid until {{ expiry() }}
+    </p>
   </div>
+
+  @if (account()?.role === 'ADMIN') {
+    <a class="btn btn-sm identity-action" routerLink="/admin/users">Manage users</a>
+  }
 </section>
 
 <section class="grid-auto rise rise-3">
@@ -72,6 +86,78 @@
 
 <section class="panel rise rise-4">
   <header class="panel-header">
+    <h2>Sign-in and security</h2>
+  </header>
+  <div class="panel-body stack">
+    @if (account(); as a) {
+      <dl class="facts">
+        <div class="fact">
+          <dt>Last signed in</dt>
+          <dd>{{ when(a.lastLoginAt) }}</dd>
+        </div>
+        <div class="fact">
+          <dt>From</dt>
+          <dd class="mono">{{ a.lastLoginIp || '—' }}</dd>
+        </div>
+        <div class="fact">
+          <dt>Sign-ins</dt>
+          <dd class="figure">{{ a.loginCount }}</dd>
+        </div>
+      </dl>
+    }
+
+    <div class="row security-actions">
+      <button type="button" class="btn" (click)="openEmail()">Change email</button>
+      <button type="button" class="btn" (click)="isPasswordOpen.set(true)">Change password</button>
+    </div>
+  </div>
+</section>
+
+<section class="panel rise rise-4">
+  <header class="panel-header">
+    <h2>Recent activity</h2>
+  </header>
+
+  @if (activity().length === 0) {
+    <div class="empty"><p>Nothing recorded yet.</p></div>
+  } @else {
+    <div class="panel-body stack">
+      <p class="text-secondary data-note">
+        Your own sign-in history. A sign-in you do not recognise is the earliest sign a
+        password has leaked — and noticing it should not depend on somebody else looking.
+      </p>
+
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col">When</th>
+              <th scope="col">Event</th>
+              <th scope="col" class="hide-sm">Address</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (entry of activity(); track entry.id) {
+              <tr>
+                <td class="date-cell">{{ when(entry.occurredAt) }}</td>
+                <td>
+                  <span class="event" [class.is-adverse]="entry.adverse">{{ entry.label }}</span>
+                  @if (entry.actor) {
+                    &ngsp;<span class="by">by {{ entry.actor }}</span>
+                  }
+                </td>
+                <td class="hide-sm mono">{{ entry.ipAddress || '—' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  }
+</section>
+
+<section class="panel rise rise-4">
+  <header class="panel-header">
     <h2>Your data</h2>
   </header>
   <div class="panel-body stack">
@@ -86,3 +172,75 @@
     </div>
   </div>
 </section>
+
+@if (isEmailOpen()) {
+  <app-modal
+    heading="Change your email"
+    description="Optional. Leave it empty to remove the one on file."
+    (closed)="isEmailOpen.set(false)"
+  >
+    <form class="entry-form" [formGroup]="emailForm" (ngSubmit)="saveEmail()" novalidate>
+      <div class="field">
+        <label for="p-email">Email</label>
+        <input id="p-email" class="input" type="email" formControlName="email" />
+        @if (emailForm.controls.email.invalid && emailForm.controls.email.touched) {
+          <span class="field-error">Enter a valid email address.</span>
+        }
+      </div>
+
+      <div class="form-actions">
+        <button type="button" class="btn" (click)="isEmailOpen.set(false)">Cancel</button>
+        <button type="submit" class="btn btn-primary" [disabled]="isSaving()">
+          {{ isSaving() ? 'Saving…' : 'Save' }}
+        </button>
+      </div>
+    </form>
+  </app-modal>
+}
+
+@if (isPasswordOpen()) {
+  <app-modal
+    heading="Change your password"
+    description="This signs you out everywhere, including here. You will need to sign in again."
+    (closed)="isPasswordOpen.set(false)"
+  >
+    <form class="entry-form" [formGroup]="passwordForm" (ngSubmit)="changePassword()" novalidate>
+      <div class="field">
+        <label for="p-current">Current password</label>
+        <input
+          id="p-current"
+          class="input"
+          type="password"
+          autocomplete="current-password"
+          formControlName="currentPassword"
+          [class.is-invalid]="invalidPassword('currentPassword')"
+        />
+        @if (invalidPassword('currentPassword')) {
+          <span class="field-error">Enter your current password.</span>
+        }
+      </div>
+
+      <div class="field">
+        <label for="p-new">New password</label>
+        <input
+          id="p-new"
+          class="input"
+          type="password"
+          autocomplete="new-password"
+          formControlName="newPassword"
+          [class.is-invalid]="invalidPassword('newPassword')"
+        />
+        @if (invalidPassword('newPassword')) {
+          <span class="field-error">At least 8 characters.</span>
+        }
+      </div>
+
+      <div class="form-actions">
+        <button type="button" class="btn" (click)="isPasswordOpen.set(false)">Cancel</button>
+        <button type="submit" class="btn btn-primary" [disabled]="isSaving()">
+          {{ isSaving() ? 'Changing…' : 'Change password' }}
+        </button>
+      </div>
+    </form>
+  </app-modal>
+}

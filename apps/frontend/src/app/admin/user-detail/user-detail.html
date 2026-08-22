@@ -1,0 +1,344 @@
+@if (isLoading()) {
+  <div class="panel rise rise-1">
+    <div class="empty"><p>Loading…</p></div>
+  </div>
+} @else if (detail(); as d) {
+  <header class="page-head rise rise-1">
+    <div class="page-title">
+      <p class="eyebrow">
+        <a class="crumb" routerLink="/admin/users">Users</a>
+      </p>
+      <h1>{{ d.account.username }}</h1>
+    </div>
+
+    <span class="head-badges">
+      <span class="chip" [class.chip-admin]="d.account.role === 'ADMIN'">
+        {{ roleLabels[d.account.role] }}
+      </span>
+      <span class="chip status-chip" [class]="'is-' + d.account.status.toLowerCase()">
+        {{ statusLabels[d.account.status] }}
+      </span>
+    </span>
+  </header>
+
+  @if (d.account.status === 'LOCKED') {
+    <p class="banner is-warning rise rise-2">
+      Locked after {{ d.failedLoginAttempts }} failed sign-ins, until
+      {{ exact(d.account.lockedUntil) }}. It clears itself, or you can clear it now.
+    </p>
+  } @else if (d.account.status === 'SUSPENDED') {
+    <p class="banner rise rise-2">
+      Suspended. They cannot sign in, and any session they had has already ended.
+    </p>
+  }
+
+  <!-- --------------------------------------------------------------- account -->
+  <section class="panel rise rise-2">
+    <header class="panel-header"><h2>Account</h2></header>
+    <div class="panel-body">
+      <dl class="facts">
+        <div class="fact">
+          <dt>Email</dt>
+          <dd>{{ d.account.email || '—' }}</dd>
+        </div>
+        <div class="fact">
+          <dt>Joined</dt>
+          <dd>{{ exact(d.account.createdAt, 'Unknown') }}</dd>
+        </div>
+        <div class="fact">
+          <dt>Last signed in</dt>
+          <dd>{{ exact(d.account.lastLoginAt) }}</dd>
+        </div>
+        <div class="fact">
+          <dt>Sign-ins</dt>
+          <dd class="figure">{{ d.account.loginCount }}</dd>
+        </div>
+        <div class="fact">
+          <dt>Last address</dt>
+          <dd class="mono">{{ d.lastLoginIp || '—' }}</dd>
+        </div>
+        <div class="fact">
+          <dt>Failed attempts</dt>
+          <dd class="figure" [class.text-negative]="d.failedLoginAttempts > 0">
+            {{ d.failedLoginAttempts }}
+          </dd>
+        </div>
+      </dl>
+    </div>
+  </section>
+
+  <!-- ----------------------------------------------------------------- holds -->
+  <section class="panel rise rise-3">
+    <header class="panel-header">
+      <h2>What this account holds</h2>
+    </header>
+    <div class="panel-body">
+      <p class="text-secondary holds-note">
+        Counts only. Transactions, budgets and categories belong to their owner, and
+        nothing on this screen — or anywhere in the admin API — can open them.
+      </p>
+      <div class="counts">
+        <div class="count">
+          <span class="figure figure-lg">{{ d.transactionCount }}</span>
+          <span class="eyebrow">Transactions</span>
+        </div>
+        <div class="count">
+          <span class="figure figure-lg">{{ d.categoryCount }}</span>
+          <span class="eyebrow">Categories</span>
+        </div>
+        <div class="count">
+          <span class="figure figure-lg">{{ d.budgetCount }}</span>
+          <span class="eyebrow">Budgets</span>
+        </div>
+        <div class="count">
+          <span class="figure figure-lg">{{ d.recurringCount }}</span>
+          <span class="eyebrow">Recurring rules</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- --------------------------------------------------------------- actions -->
+  <section class="panel rise rise-3">
+    <header class="panel-header"><h2>Manage</h2></header>
+    <div class="panel-body stack">
+      @if (isSelf()) {
+        <p class="banner">
+          This is your own account. Changing your own role, suspending yourself or
+          deleting yourself is refused — it is the one mistake there is no way back
+          from. Ask another administrator.
+        </p>
+      }
+
+      <!-- role -->
+      <div class="action-row" [formGroup]="roleForm">
+        <div class="action-text">
+          <h3>Role</h3>
+          <p>
+            An admin manages accounts and can read this log. It grants no access to
+            anybody's spending.
+          </p>
+        </div>
+        <div class="action-controls">
+          <select class="select" formControlName="role" [disabled]="isSelf() || isBusy()">
+            <option value="MEMBER">Member</option>
+            <option value="ADMIN">Admin</option>
+          </select>
+          <button
+            type="button"
+            class="btn btn-primary btn-sm"
+            [disabled]="isSelf() || isBusy() || roleForm.getRawValue().role === d.account.role"
+            (click)="saveRole()"
+          >
+            Save
+          </button>
+        </div>
+      </div>
+
+      <!-- suspend / reinstate -->
+      <div class="action-row">
+        <div class="action-text">
+          <h3>{{ d.account.status === 'SUSPENDED' ? 'Reinstate' : 'Suspend' }}</h3>
+          <p>
+            {{
+              d.account.status === 'SUSPENDED'
+                ? 'Lets them sign in again, and clears any failed attempts.'
+                : 'Blocks sign-in and ends every session immediately. Nothing is deleted.'
+            }}
+          </p>
+        </div>
+        <div class="action-controls">
+          @if (d.account.status === 'SUSPENDED') {
+            <button
+              type="button"
+              class="btn btn-primary btn-sm"
+              [disabled]="isBusy()"
+              (click)="setActive(true)"
+            >
+              Reinstate
+            </button>
+          } @else {
+            <button
+              type="button"
+              class="btn btn-danger btn-sm"
+              [disabled]="isSelf() || isBusy()"
+              (click)="setActive(false)"
+            >
+              Suspend
+            </button>
+          }
+        </div>
+      </div>
+
+      <!-- unlock -->
+      @if (d.account.status === 'LOCKED' || d.failedLoginAttempts > 0) {
+        <div class="action-row">
+          <div class="action-text">
+            <h3>Clear the lock</h3>
+            <p>Resets the failed-attempt count without waiting for the lock to expire.</p>
+          </div>
+          <div class="action-controls">
+            <button type="button" class="btn btn-sm" [disabled]="isBusy()" (click)="unlock()">
+              Unlock
+            </button>
+          </div>
+        </div>
+      }
+
+      <!-- password -->
+      <div class="action-row">
+        <div class="action-text">
+          <h3>Set a password</h3>
+          <p>
+            There is no mail delivery here, so a reset means handing one over yourself.
+            Every session for the account ends.
+          </p>
+        </div>
+        <div class="action-controls">
+          <button
+            type="button"
+            class="btn btn-sm"
+            [disabled]="isBusy()"
+            (click)="isPasswordOpen.set(true)"
+          >
+            Set password
+          </button>
+        </div>
+      </div>
+
+      <!-- sessions -->
+      <div class="action-row">
+        <div class="action-text">
+          <h3>Sign out everywhere</h3>
+          <p>Ends every session without changing the password. They can sign back in.</p>
+        </div>
+        <div class="action-controls">
+          <button
+            type="button"
+            class="btn btn-sm"
+            [disabled]="isBusy()"
+            (click)="revokeSessions()"
+          >
+            Revoke sessions
+          </button>
+        </div>
+      </div>
+
+      <!-- delete -->
+      <div class="action-row is-danger-row">
+        <div class="action-text">
+          <h3>Delete</h3>
+          <p>
+            Removes the account and every transaction, budget, category and rule it
+            owns. The activity log below is kept. There is no undo.
+          </p>
+        </div>
+        <div class="action-controls">
+          <button
+            type="button"
+            class="btn btn-danger btn-sm"
+            [disabled]="isSelf() || isBusy()"
+            (click)="isDeleteOpen.set(true)"
+          >
+            Delete account
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- -------------------------------------------------------------- activity -->
+  <section class="panel rise rise-4">
+    <header class="panel-header">
+      <h2>Recent activity</h2>
+      <a class="btn btn-ghost btn-sm" routerLink="/admin/activity">Full log</a>
+    </header>
+
+    @if (d.recentActivity.length === 0) {
+      <div class="empty"><p>Nothing recorded yet.</p></div>
+    } @else {
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col">When</th>
+              <th scope="col">Event</th>
+              <th scope="col" class="hide-sm">Detail</th>
+              <th scope="col" class="hide-sm">Address</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (entry of d.recentActivity; track entry.id) {
+              <tr>
+                <td class="date-cell">{{ exact(entry.occurredAt) }}</td>
+                <td>
+                  <span class="event" [class.is-adverse]="entry.adverse">{{ entry.label }}</span>
+                  @if (entry.actor) {
+                    &ngsp;<span class="by">by {{ entry.actor }}</span>
+                  }
+                </td>
+                <td class="hide-sm text-secondary">{{ entry.detail || '—' }}</td>
+                <td class="hide-sm mono">{{ entry.ipAddress || '—' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </section>
+
+  <!-- ---------------------------------------------------------------- modals -->
+  @if (isPasswordOpen()) {
+    <app-modal
+      heading="Set a new password"
+      [description]="'Every session for ' + d.account.username + ' will end.'"
+      (closed)="isPasswordOpen.set(false)"
+    >
+      <form class="entry-form" [formGroup]="passwordForm" (ngSubmit)="setPassword()" novalidate>
+        <div class="field">
+          <label for="new-password">New password</label>
+          <input
+            id="new-password"
+            class="input"
+            type="text"
+            autocomplete="off"
+            formControlName="newPassword"
+          />
+          <span class="field-hint">
+            Shown in plain text so you can read it out. At least 8 characters.
+          </span>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn" (click)="isPasswordOpen.set(false)">Cancel</button>
+          <button type="submit" class="btn btn-primary" [disabled]="isBusy()">
+            {{ isBusy() ? 'Setting…' : 'Set password' }}
+          </button>
+        </div>
+      </form>
+    </app-modal>
+  }
+
+  @if (isDeleteOpen()) {
+    <app-modal heading="Delete this account?" (closed)="isDeleteOpen.set(false)">
+      <p class="confirm-text">
+        <strong>{{ d.account.username }}</strong> will be removed along with
+        {{ d.transactionCount }} transaction{{ d.transactionCount === 1 ? '' : 's' }},
+        {{ d.budgetCount }} budget{{ d.budgetCount === 1 ? '' : 's' }} and
+        {{ d.recurringCount }} recurring rule{{ d.recurringCount === 1 ? '' : 's' }}. This
+        cannot be undone.
+      </p>
+      <div class="form-actions">
+        <button type="button" class="btn" (click)="isDeleteOpen.set(false)">Keep it</button>
+        <button
+          type="button"
+          class="btn btn-primary is-danger"
+          [disabled]="isBusy()"
+          (click)="confirmDelete()"
+        >
+          {{ isBusy() ? 'Deleting…' : 'Delete permanently' }}
+        </button>
+      </div>
+    </app-modal>
+  }
+}

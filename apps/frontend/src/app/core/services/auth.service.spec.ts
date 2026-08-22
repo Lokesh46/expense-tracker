@@ -133,6 +133,62 @@ describe('AuthService', () => {
     expect(sessionStorage.getItem('auth_token')).toBeNull();
   });
 
+  describe('role', () => {
+    /**
+     * Read from the token so the UI can decide what to render without a round
+     * trip. It decides nothing on its own — the API rechecks the stored role on
+     * every request — so being briefly stale costs a 403, not access.
+     */
+    it('reads ADMIN from the scope claim', () => {
+      configure();
+      service
+        .authenticate({ username: 'root', password: 'x' })
+        .subscribe();
+      http
+        .expectOne('/authenticate')
+        .flush({ token: fakeJwt({ sub: 'root', exp: inOneHour(), scope: 'ROLE_ADMIN' }) });
+
+      expect(service.getRole()).toBe('ADMIN');
+      expect(service.isAdmin()).toBe(true);
+    });
+
+    it('reads MEMBER from the scope claim', () => {
+      configure();
+      service.authenticate({ username: 'mia', password: 'x' }).subscribe();
+      http
+        .expectOne('/authenticate')
+        .flush({ token: fakeJwt({ sub: 'mia', exp: inOneHour(), scope: 'ROLE_MEMBER' }) });
+
+      expect(service.getRole()).toBe('MEMBER');
+      expect(service.isAdmin()).toBe(false);
+    });
+
+    /** A token from an older build. Unknown, not "member" — the guard asks the API. */
+    it('reports no role when the token has no scope claim', () => {
+      localStorage.setItem('auth_token', fakeJwt({ sub: 'mia', exp: inOneHour() }));
+      configure();
+
+      expect(service.getRole()).toBeNull();
+      expect(service.isAdmin()).toBe(false);
+    });
+
+    it('forgets the role on sign-out', () => {
+      configure();
+      service.authenticate({ username: 'root', password: 'x' }).subscribe();
+      http
+        .expectOne('/authenticate')
+        .flush({ token: fakeJwt({ sub: 'root', exp: inOneHour(), scope: 'ROLE_ADMIN' }) });
+
+      const seen: (string | null)[] = [];
+      service.role$.subscribe((role) => seen.push(role));
+
+      service.logout();
+
+      expect(seen).toEqual(['ADMIN', null]);
+      expect(service.isAdmin()).toBe(false);
+    });
+  });
+
   it('exposes when the session expires', () => {
     const exp = inOneHour();
     localStorage.setItem('auth_token', fakeJwt({ sub: 'ada', exp }));

@@ -1,0 +1,157 @@
+<header class="page-head rise rise-1">
+  <div class="page-title">
+    <p class="eyebrow">
+      <a class="crumb" routerLink="/admin/users">Administration</a>
+    </p>
+    <h1>Activity</h1>
+  </div>
+
+  <button type="button" class="btn btn-sm" (click)="exportCsv()">Export</button>
+</header>
+
+<p class="lede rise rise-2">
+  Sign-ins, failed attempts, lockouts and account changes. Ordinary use is not
+  recorded, so nothing anybody spent appears here.
+</p>
+
+<!-- ------------------------------------------------------------------- filters -->
+<section class="filters panel rise rise-2" [formGroup]="filters">
+  <div class="filter-grid">
+    <div class="field filter-search">
+      <label for="a-username">Account</label>
+      <input
+        id="a-username"
+        class="input"
+        type="search"
+        formControlName="username"
+        placeholder="Exact username"
+      />
+    </div>
+
+    <div class="field">
+      <label for="a-action">Event</label>
+      <select id="a-action" class="select" formControlName="action">
+        <option value="">All</option>
+        @for (action of actions; track action.value) {
+          <option [value]="action.value">{{ action.label }}</option>
+        }
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="a-from">From</label>
+      <input id="a-from" class="input" type="date" formControlName="from" />
+    </div>
+
+    <div class="field">
+      <label for="a-to">To</label>
+      <input id="a-to" class="input" type="date" formControlName="to" />
+    </div>
+  </div>
+
+  <div class="filter-foot">
+    <label class="adverse-toggle">
+      <input type="checkbox" formControlName="adverseOnly" />
+      <span>Problems only</span>
+    </label>
+
+    <span class="row">
+      <span class="text-tertiary">{{ rangeLabel() }}</span>
+      @if (hasFilters()) {
+        <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()">Clear</button>
+      }
+    </span>
+  </div>
+</section>
+
+<!-- --------------------------------------------------------------------- table -->
+<section class="results panel rise rise-3">
+  @if (isLoading()) {
+    <div class="empty"><p>Loading…</p></div>
+  } @else if (rows().length === 0) {
+    <div class="empty">
+      <h3>{{ hasFilters() ? 'Nothing matches' : 'Nothing recorded yet' }}</h3>
+      <p>
+        {{
+          hasFilters()
+            ? 'Try a wider date range, or clear the filters.'
+            : 'Sign-ins and account changes will appear here as they happen.'
+        }}
+      </p>
+    </div>
+  } @else {
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th scope="col">When</th>
+            <th scope="col">Event</th>
+            <th scope="col">Account</th>
+            <th scope="col" class="hide-sm">Detail</th>
+            <th scope="col" class="hide-sm">Address</th>
+            <th scope="col" class="hide-sm">Client</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          @for (entry of rows(); track entry.id) {
+            <tr [class.is-adverse-row]="entry.adverse">
+              <td class="date-cell">{{ exact(entry.occurredAt) }}</td>
+
+              <td>
+                <span class="event" [class.is-adverse]="entry.adverse">{{ entry.label }}</span>
+              </td>
+
+              <td>
+                <span class="who">{{ entry.username }}</span>
+                @if (entry.actor) {
+                  &ngsp;<span class="by">by {{ entry.actor }}</span>
+                }
+              </td>
+
+              <td class="hide-sm text-secondary detail-cell">{{ entry.detail || '—' }}</td>
+
+              <td class="hide-sm mono">{{ entry.ipAddress || '—' }}</td>
+
+              <td class="hide-sm text-secondary" [title]="entry.userAgent || ''">
+                {{ client(entry.userAgent) }}
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <footer class="results-foot">
+      <span class="text-tertiary range">{{ rangeLabel() }}</span>
+
+      <div class="pager">
+        <label class="page-size">
+          <span class="sr-only">Rows per page</span>
+          <select class="select" [value]="size()" (change)="changeSize($any($event.target).value)">
+            <option [value]="25">25</option>
+            <option [value]="50">50</option>
+            <option [value]="100">100</option>
+          </select>
+        </label>
+
+        <button
+          type="button"
+          class="btn btn-sm"
+          (click)="goToPage(page() - 1)"
+          [disabled]="page() === 0"
+        >
+          Previous
+        </button>
+        <button
+          type="button"
+          class="btn btn-sm"
+          (click)="goToPage(page() + 1)"
+          [disabled]="page() >= totalPages() - 1"
+        >
+          Next
+        </button>
+      </div>
+    </footer>
+  }
+</section>

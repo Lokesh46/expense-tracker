@@ -120,6 +120,26 @@
   white-space: nowrap;
 }
 
+/* --- administration --- */
+
+.nav-heading {
+  margin: 0 0 var(--space-1);
+  padding: 0 var(--space-3);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+/*
+ * Only the primary list takes the leftover height. Without this both lists
+ * claim flex: 1 and split it, which pushes the admin section into the middle of
+ * the rail and leaves a gap above the foot.
+ */
+.nav-admin {
+  flex: none;
+}
+
 /* --- foot --- */
 
 .sidebar-foot {
@@ -190,6 +210,16 @@
     flex-direction: row;
     justify-content: space-around;
     gap: 0;
+  }
+
+  /* The heading has no room in a bottom bar, and the items beneath it read
+     clearly enough on their own there. */
+  .nav-heading {
+    display: none;
+  }
+
+  .nav-link.hide-mobile {
+    display: none;
   }
 
   .nav-link {

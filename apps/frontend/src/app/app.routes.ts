@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 
+import { adminGuard } from './core/guards/admin.guard';
 import { authGuard } from './core/guards/auth.guard';
 import { guestGuard } from './core/guards/guest.guard';
 
@@ -61,6 +62,34 @@ export const routes: Routes = [
     loadComponent: () => import('./profile/profile').then((m) => m.Profile),
     title: 'Account · Ledger',
   },
+
+  /**
+   * Administration. Guarded twice: signed in at all, and an administrator.
+   *
+   * Both guards are conveniences — the API checks the stored role on every
+   * request regardless — so their job is to keep a member off a page that would
+   * otherwise fill with refusals.
+   */
+  {
+    path: 'admin/users',
+    canActivate: [authGuard, adminGuard],
+    loadComponent: () => import('./admin/users/users').then((m) => m.AdminUsersComponent),
+    title: 'Users · Ledger',
+  },
+  {
+    path: 'admin/users/:id',
+    canActivate: [authGuard, adminGuard],
+    loadComponent: () =>
+      import('./admin/user-detail/user-detail').then((m) => m.AdminUserDetailComponent),
+    title: 'Account · Ledger',
+  },
+  {
+    path: 'admin/activity',
+    canActivate: [authGuard, adminGuard],
+    loadComponent: () => import('./admin/activity/activity').then((m) => m.AdminActivityComponent),
+    title: 'Activity · Ledger',
+  },
+  { path: 'admin', pathMatch: 'full', redirectTo: 'admin/users' },
 
   { path: '**', redirectTo: 'dashboard' },
 ];

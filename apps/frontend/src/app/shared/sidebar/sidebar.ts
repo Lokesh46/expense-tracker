@@ -1,6 +1,8 @@
-import { Component, inject } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 
+import { AccountService } from '../../core/services/account.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ThemeService } from '../../core/services/theme.service';
 
@@ -9,6 +11,13 @@ interface NavItem {
   label: string;
   /** An SVG path drawn on a 24x24 grid. */
   icon: string;
+  /**
+   * Dropped from the bottom bar on small screens.
+   *
+   * Ten controls do not fit across a phone. Activity is the one that can go,
+   * because every account's detail page links to it.
+   */
+  hideOnMobile?: boolean;
 }
 
 @Component({
@@ -20,6 +29,7 @@ interface NavItem {
 })
 export class SidebarComponent {
   private readonly auth = inject(AuthService);
+  private readonly accountService = inject(AccountService);
   private readonly router = inject(Router);
   protected readonly themeService = inject(ThemeService);
 
@@ -31,8 +41,40 @@ export class SidebarComponent {
     { path: '/recurring', label: 'Recurring', icon: 'M3 12a9 9 0 0 1 15-6.7L21 8M21 12a9 9 0 0 1-15 6.7L3 16M21 4v4h-4M3 20v-4h4' },
   ];
 
+  protected readonly adminItems: NavItem[] = [
+    { path: '/admin/users', label: 'Users', icon: 'M16 20v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V20M9.5 10.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7M17 11l2 2 4-4' },
+    { path: '/admin/activity', label: 'Activity', icon: 'M3 12h4l2.5-7 4 14 2.5-7h5', hideOnMobile: true },
+  ];
+
+  private readonly tokenRole = toSignal(this.auth.role$, { initialValue: this.auth.getRole() });
+
+  /**
+   * Whether to offer the admin section.
+   *
+   * The loaded profile wins when there is one, because it is the current answer;
+   * the token's claim stands in until then, so the section does not appear a
+   * moment late on every page load. Neither decides anything — the API rechecks
+   * the stored role on every request — so being briefly wrong costs a 403, not
+   * access.
+   */
+  protected readonly isAdmin = computed(() => {
+    const profile = this.accountService.profile();
+    return profile ? profile.role === 'ADMIN' : this.tokenRole() === 'ADMIN';
+  });
+
+  constructor() {
+    // Asked for once per session. It also settles the case the token cannot: an
+    // administrator who was demoted while this tab was open.
+    this.accountService.load().subscribe({
+      error: () => {
+        // The token's claim carries the navigation until the next load. A failure
+        // here is already reported by the interceptor if it ended the session.
+      },
+    });
+  }
+
   protected get username(): string {
-    return this.auth.getUsername() ?? 'Account';
+    return this.accountService.profile()?.username ?? this.auth.getUsername() ?? 'Account';
   }
 
   protected get initial(): string {

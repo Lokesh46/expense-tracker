@@ -1,0 +1,208 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.crumb {
+  color: inherit;
+  text-decoration: none;
+}
+
+.crumb:hover {
+  color: var(--accent);
+}
+
+.crumb::after {
+  content: ' /';
+  color: var(--text-tertiary);
+}
+
+.head-badges {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.chip-admin {
+  border-color: var(--rule-accent);
+  color: var(--accent);
+}
+
+.status-chip.is-active {
+  border-color: color-mix(in srgb, var(--positive) 40%, transparent);
+  color: var(--positive);
+}
+
+.status-chip.is-locked {
+  border-color: color-mix(in srgb, var(--negative) 40%, transparent);
+  color: var(--negative);
+}
+
+/* Suspended is deliberately the quiet one: it is a state somebody chose, not
+   something going wrong. */
+.status-chip.is-suspended {
+  color: var(--text-tertiary);
+}
+
+/* ------------------------------------------------------------------ banners */
+
+.banner {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-left: 2px solid var(--rule-strong);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.banner.is-warning {
+  border-left-color: var(--negative);
+  background: var(--negative-muted);
+  color: var(--text-primary);
+}
+
+/* -------------------------------------------------------------------- facts */
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-4);
+  margin: 0;
+}
+
+.fact {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.fact dt {
+  font-size: var(--text-2xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.fact dd {
+  margin: 0;
+  font-size: var(--text-sm);
+  /* Addresses and long emails must not push the grid wider than the panel. */
+  overflow-wrap: anywhere;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+/* ------------------------------------------------------------------- counts */
+
+.holds-note {
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-sm);
+  max-width: 62ch;
+}
+
+.counts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--space-4);
+}
+
+.count {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* ------------------------------------------------------------------ actions */
+
+.action-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-5);
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--rule);
+}
+
+.action-row:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+
+.action-row.is-danger-row {
+  border-top-color: color-mix(in srgb, var(--negative) 30%, var(--rule));
+}
+
+.action-text {
+  min-width: 0;
+}
+
+.action-text h3 {
+  margin: 0 0 2px;
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  font-weight: 500;
+}
+
+.action-text p {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  max-width: 58ch;
+}
+
+.action-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+}
+
+.action-controls .select {
+  padding-block: 0.35rem;
+  font-size: var(--text-sm);
+}
+
+@media (max-width: 640px) {
+  .action-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .action-controls {
+    justify-content: flex-end;
+  }
+}
+
+/* ----------------------------------------------------------------- activity */
+
+.date-cell {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.event {
+  font-weight: 500;
+}
+
+.event.is-adverse {
+  color: var(--negative);
+}
+
+.by {
+  margin-left: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.field-hint {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}

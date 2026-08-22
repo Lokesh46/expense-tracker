@@ -1,0 +1,313 @@
+<header class="page-head rise rise-1">
+  <div class="page-title">
+    <p class="eyebrow">Administration</p>
+    <h1>Users</h1>
+  </div>
+
+  <button type="button" class="btn btn-primary btn-sm" (click)="openCreate()">Add user</button>
+</header>
+
+<p class="lede rise rise-2">
+  Who has an account, what they may do, and when they were last here. Ledgers stay
+  private — this screen counts what an account holds, and never shows it.
+</p>
+
+<!-- ------------------------------------------------------------------- summary -->
+@if (stats(); as s) {
+  <section class="stat-strip rise rise-2" aria-label="Summary">
+    <div class="stat">
+      <span class="eyebrow">Accounts</span>
+      <span class="figure figure-lg">{{ s.totalUsers }}</span>
+      <span class="stat-note">{{ s.admins }} admin, {{ s.members }} member</span>
+    </div>
+    <div class="stat">
+      <span class="eyebrow">Active</span>
+      <span class="figure figure-lg">{{ s.active }}</span>
+      <span class="stat-note">
+        @if (s.suspended || s.locked) {
+          {{ s.suspended }} suspended, {{ s.locked }} locked
+        } @else {
+          None suspended or locked
+        }
+      </span>
+    </div>
+    <div class="stat">
+      <span class="eyebrow">New this week</span>
+      <span class="figure figure-lg">{{ s.joinedLast7Days }}</span>
+      <span class="stat-note">{{ s.joinedLast30Days }} in 30 days</span>
+    </div>
+    <div class="stat">
+      <span class="eyebrow">Sign-ins today</span>
+      <span class="figure figure-lg">{{ s.signInsLast24Hours }}</span>
+      <span class="stat-note" [class.text-negative]="s.failedSignInsLast24Hours > 0">
+        {{ s.failedSignInsLast24Hours }} failed
+      </span>
+    </div>
+  </section>
+}
+
+<!-- ------------------------------------------------------------------- filters -->
+<section class="filters panel rise rise-3" [formGroup]="filters">
+  <div class="filter-grid">
+    <div class="field filter-search">
+      <label for="u-search">Search</label>
+      <input
+        id="u-search"
+        class="input"
+        type="search"
+        formControlName="search"
+        placeholder="Username or email"
+      />
+    </div>
+
+    <div class="field">
+      <label for="u-role">Role</label>
+      <select id="u-role" class="select" formControlName="role">
+        <option value="">All</option>
+        <option value="ADMIN">Admin</option>
+        <option value="MEMBER">Member</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="u-status">Status</label>
+      <select id="u-status" class="select" formControlName="status">
+        <option value="">Any</option>
+        <option value="ACTIVE">Active</option>
+        <option value="SUSPENDED">Suspended</option>
+        <option value="LOCKED">Locked</option>
+      </select>
+    </div>
+  </div>
+
+  @if (hasFilters()) {
+    <div class="filter-foot">
+      <span class="text-tertiary">{{ rangeLabel() }}</span>
+      <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()">
+        Clear filters
+      </button>
+    </div>
+  }
+</section>
+
+<!-- --------------------------------------------------------------------- table -->
+<section class="results panel rise rise-4">
+  @if (isLoading()) {
+    <div class="empty"><p>Loading…</p></div>
+  } @else if (rows().length === 0) {
+    <div class="empty">
+      <h3>{{ hasFilters() ? 'No accounts match' : 'No accounts yet' }}</h3>
+      <p>
+        {{
+          hasFilters()
+            ? 'Try a broader search, or clear the filters.'
+            : 'Anyone can register, or you can create an account here.'
+        }}
+      </p>
+    </div>
+  } @else {
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th scope="col">
+              <button type="button" class="sort-btn" (click)="sort('username')">
+                Account <span class="sort-mark">{{ sortMark('username') }}</span>
+              </button>
+            </th>
+            <th scope="col">
+              <button type="button" class="sort-btn" (click)="sort('role')">
+                Role <span class="sort-mark">{{ sortMark('role') }}</span>
+              </button>
+            </th>
+            <th scope="col">Status</th>
+            <th scope="col">
+              <button type="button" class="sort-btn" (click)="sort('lastLoginAt')">
+                Last seen <span class="sort-mark">{{ sortMark('lastLoginAt') }}</span>
+              </button>
+            </th>
+            <th scope="col" class="hide-sm">
+              <button type="button" class="sort-btn is-right" (click)="sort('loginCount')">
+                Sign-ins <span class="sort-mark">{{ sortMark('loginCount') }}</span>
+              </button>
+            </th>
+            <th scope="col" class="hide-sm">
+              <button type="button" class="sort-btn" (click)="sort('createdAt')">
+                Joined <span class="sort-mark">{{ sortMark('createdAt') }}</span>
+              </button>
+            </th>
+            <th scope="col"><span class="sr-only">Actions</span></th>
+          </tr>
+        </thead>
+
+        <tbody>
+          @for (user of rows(); track user.id) {
+            <tr>
+              <td>
+                <span class="account-cell">
+                  <span class="avatar-sm" aria-hidden="true">
+                    {{ user.username.charAt(0).toUpperCase() }}
+                  </span>
+                  <span class="account-text">
+                    <span class="account-name">
+                      {{ user.username }}
+                      @if (user.username === me) {
+                        <span class="chip chip-you">You</span>
+                      }
+                    </span>
+                    @if (user.email) {
+                      <span class="account-email">{{ user.email }}</span>
+                    }
+                  </span>
+                </span>
+              </td>
+
+              <td>
+                <span class="chip" [class.chip-admin]="user.role === 'ADMIN'">
+                  {{ roleLabels[user.role] }}
+                </span>
+              </td>
+
+              <td>
+                <span class="status">
+                  <span
+                    class="dot"
+                    [class.is-active]="user.status === 'ACTIVE'"
+                    [class.is-suspended]="user.status === 'SUSPENDED'"
+                    [class.is-locked]="user.status === 'LOCKED'"
+                    aria-hidden="true"
+                  ></span>
+                  {{ statusLabels[user.status] }}
+                </span>
+              </td>
+
+              <td class="date-cell" [title]="exact(user.lastLoginAt)">
+                {{ relative(user.lastLoginAt) }}
+              </td>
+
+              <td class="num hide-sm">{{ user.loginCount }}</td>
+
+              <td class="date-cell hide-sm" [title]="exact(user.createdAt, 'Unknown')">
+                {{ relative(user.createdAt, 'Unknown') }}
+              </td>
+
+              <td class="actions">
+                <a class="btn btn-ghost btn-sm" [routerLink]="['/admin/users', user.id]">Manage</a>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <footer class="results-foot">
+      <span class="text-tertiary range">{{ rangeLabel() }}</span>
+
+      <div class="pager">
+        <label class="page-size">
+          <span class="sr-only">Rows per page</span>
+          <select class="select" [value]="size()" (change)="changeSize($any($event.target).value)">
+            <option [value]="10">10</option>
+            <option [value]="20">20</option>
+            <option [value]="50">50</option>
+          </select>
+        </label>
+
+        <button
+          type="button"
+          class="btn btn-sm"
+          (click)="goToPage(page() - 1)"
+          [disabled]="page() === 0"
+        >
+          Previous
+        </button>
+        <button
+          type="button"
+          class="btn btn-sm"
+          (click)="goToPage(page() + 1)"
+          [disabled]="page() >= totalPages() - 1"
+        >
+          Next
+        </button>
+      </div>
+    </footer>
+  }
+</section>
+
+<!-- ---------------------------------------------------------------- new user -->
+@if (isFormOpen()) {
+  <app-modal
+    heading="Add a user"
+    description="They can sign in straight away, with eight starter categories already set up."
+    (closed)="isFormOpen.set(false)"
+  >
+    <form class="entry-form" [formGroup]="form" (ngSubmit)="save()" novalidate>
+      <div class="field">
+        <label for="n-username">Username</label>
+        <input
+          id="n-username"
+          class="input"
+          type="text"
+          autocomplete="off"
+          formControlName="username"
+          [class.is-invalid]="invalid('username')"
+        />
+        @if (invalid('username')) {
+          <span class="field-error">Use between 3 and 30 characters.</span>
+        }
+      </div>
+
+      <div class="field">
+        <label for="n-email">Email <span class="text-tertiary">(optional)</span></label>
+        <input
+          id="n-email"
+          class="input"
+          type="email"
+          autocomplete="off"
+          formControlName="email"
+          [class.is-invalid]="invalid('email')"
+        />
+        @if (invalid('email')) {
+          <span class="field-error">Enter a valid email address.</span>
+        }
+      </div>
+
+      <div class="pair">
+        <div class="field">
+          <label for="n-password">Temporary password</label>
+          <input
+            id="n-password"
+            class="input"
+            type="text"
+            autocomplete="off"
+            formControlName="password"
+            [class.is-invalid]="invalid('password')"
+          />
+          @if (invalid('password')) {
+            <span class="field-error">At least 8 characters.</span>
+          }
+        </div>
+
+        <div class="field">
+          <label for="n-role">Role</label>
+          <select id="n-role" class="select" formControlName="role">
+            <option value="MEMBER">Member</option>
+            <option value="ADMIN">Admin</option>
+          </select>
+        </div>
+      </div>
+
+      <p class="form-note">
+        Shown in plain text on purpose — there is no mail delivery here, so you will need
+        to read it out. Ask them to change it once they are in.
+      </p>
+
+      <div class="form-actions">
+        <button type="button" class="btn" (click)="isFormOpen.set(false)">Cancel</button>
+        <button type="submit" class="btn btn-primary" [disabled]="isSaving()">
+          {{ isSaving() ? 'Creating…' : 'Create account' }}
+        </button>
+      </div>
+    </form>
+  </app-modal>
+}

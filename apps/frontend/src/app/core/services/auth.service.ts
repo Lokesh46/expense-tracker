@@ -4,12 +4,15 @@ import { BehaviorSubject, Observable, tap } from 'rxjs';
 
 import { API_BASE_URL } from '../tokens/api-base-url.token';
 import { AuthRequest, AuthResponse, RegisterRequest } from '../models/auth.models';
+import { Role } from '../models/user.models';
 
 const TOKEN_KEY = 'auth_token';
 
 interface JwtClaims {
   sub?: string;
   exp?: number;
+  /** Space-separated authorities, e.g. "ROLE_ADMIN". */
+  scope?: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -19,6 +22,17 @@ export class AuthService {
 
   private readonly authState = new BehaviorSubject<boolean>(this.hasValidToken());
   readonly isAuthenticated$ = this.authState.asObservable();
+
+  /**
+   * The role named by the token.
+   *
+   * <p>Used to decide what to render without waiting for a round trip, and for
+   * nothing else. It is a claim rather than an authority: the server re-checks
+   * the stored role on every request, so a stale token cannot grant anything —
+   * it can only make the UI briefly offer a screen the API then refuses.
+   */
+  private readonly roleState = new BehaviorSubject<Role | null>(this.roleFromToken());
+  readonly role$ = this.roleState.asObservable();
 
   private readonly expiryCheckInterval = 30_000;
 
@@ -53,6 +67,27 @@ export class AuthService {
   /** The signed-in username, read from the token's subject claim. */
   getUsername(): string | null {
     return this.claims()?.sub ?? null;
+  }
+
+  /** The role named by the token, for optimistic rendering only. */
+  getRole(): Role | null {
+    return this.roleFromToken();
+  }
+
+  isAdmin(): boolean {
+    return this.roleFromToken() === 'ADMIN';
+  }
+
+  private roleFromToken(): Role | null {
+    const scope = this.claims()?.scope;
+    if (!scope) {
+      return null;
+    }
+    const authorities = scope.split(' ');
+    if (authorities.includes('ROLE_ADMIN')) {
+      return 'ADMIN';
+    }
+    return authorities.includes('ROLE_MEMBER') ? 'MEMBER' : null;
   }
 
   /** When the session expires, or null if there is no usable token. */
@@ -109,11 +144,13 @@ export class AuthService {
     storage.setItem(TOKEN_KEY, token);
     other.removeItem(TOKEN_KEY);
     this.authState.next(true);
+    this.roleState.next(this.roleFromToken());
   }
 
   private clearToken(): void {
     localStorage.removeItem(TOKEN_KEY);
     sessionStorage.removeItem(TOKEN_KEY);
     this.authState.next(false);
+    this.roleState.next(null);
   }
 }

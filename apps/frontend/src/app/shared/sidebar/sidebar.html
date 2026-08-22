@@ -28,6 +28,31 @@
     }
   </ul>
 
+  @if (isAdmin()) {
+    <!-- Only rendered for an administrator. The API refuses these paths for
+         anyone else regardless, so this is tidiness rather than a boundary. -->
+    <p class="nav-heading">Administration</p>
+    <ul class="nav nav-admin">
+      @for (item of adminItems; track item.path) {
+        <li>
+          <a
+            class="nav-link"
+            [class.hide-mobile]="item.hideOnMobile"
+            [routerLink]="item.path"
+            routerLinkActive="is-active"
+            #adminRla="routerLinkActive"
+            [attr.aria-current]="adminRla.isActive ? 'page' : null"
+          >
+            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path [attr.d]="item.icon" />
+            </svg>
+            <span class="nav-label">{{ item.label }}</span>
+          </a>
+        </li>
+      }
+    </ul>
+  }
+
   <div class="sidebar-foot">
     <button
       type="button"
