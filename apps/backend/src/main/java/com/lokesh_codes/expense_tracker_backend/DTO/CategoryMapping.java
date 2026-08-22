@@ -2,13 +2,12 @@ package com.lokesh_codes.expense_tracker_backend.DTO;
 
 import com.lokesh_codes.expense_tracker_backend.entity.Category;
 
-public class CategoryMapping {
+public final class CategoryMapping {
 
-    public static CategoryDTO toDTO(Category category) {
-        return new CategoryDTO(category.getId(), category.getName());
+    private CategoryMapping() {
     }
 
-    public static Category toEntity(CategoryDTO categoryDTO) {
-        return new Category(categoryDTO.getId(), categoryDTO.getName());
+    public static CategoryDTO toDTO(Category category) {
+        return new CategoryDTO(category.getId(), category.getName(), category.getColor());
     }
 }

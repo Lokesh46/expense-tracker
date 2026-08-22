@@ -1,104 +1,85 @@
 package com.lokesh_codes.expense_tracker_backend.security;
 
-import com.lokesh_codes.expense_tracker_backend.entity.User;
-import com.lokesh_codes.expense_tracker_backend.repository.UserRepository;
+import java.util.Map;
+
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Optional;
-import java.util.regex.Pattern;
+import com.lokesh_codes.expense_tracker_backend.entity.User;
+import com.lokesh_codes.expense_tracker_backend.exception.ConflictException;
+import com.lokesh_codes.expense_tracker_backend.repository.UserRepository;
+import com.lokesh_codes.expense_tracker_backend.service.CategoryService;
+
+import jakarta.validation.Valid;
 
 @RestController
 public class JwtAuthenticationController {
 
     private final JwtTokenService tokenService;
-
     private final AuthenticationManager authenticationManager;
-
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final CategoryService categoryService;
 
     public JwtAuthenticationController(JwtTokenService tokenService,
-            AuthenticationManager authenticationManager, UserRepository userRepository,
-            PasswordEncoder passwordEncoder) {
+            AuthenticationManager authenticationManager,
+            UserRepository userRepository,
+            PasswordEncoder passwordEncoder,
+            CategoryService categoryService) {
         this.tokenService = tokenService;
         this.authenticationManager = authenticationManager;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.categoryService = categoryService;
     }
 
     @PostMapping("/authenticate")
-    public ResponseEntity<JwtTokenResponse> generateToken(
-            @RequestBody JwtTokenRequest jwtTokenRequest) {
+    public ResponseEntity<JwtTokenResponse> generateToken(@Valid @RequestBody JwtTokenRequest request) {
+        // A failure here raises an AuthenticationException, which the global
+        // handler turns into a 401 that does not reveal whether the username exists.
+        var authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(request.username(), request.password()));
 
-        var authenticationToken = new UsernamePasswordAuthenticationToken(
-                jwtTokenRequest.username(),
-                jwtTokenRequest.password());
-
-        var authentication = authenticationManager.authenticate(authenticationToken);
-
-        var token = tokenService.generateToken(authentication);
-
-        return ResponseEntity.ok(new JwtTokenResponse(token));
+        return ResponseEntity.ok(new JwtTokenResponse(tokenService.generateToken(authentication)));
     }
 
+    /**
+     * Creates an account and seeds it with starter categories, so a new user can
+     * record an expense straight away instead of landing on empty screens.
+     */
     @PostMapping("/register")
-    public ResponseEntity<String> registerUser(@RequestBody RegisterRequest registerRequest) {
-        Optional<User> existingUser = userRepository.findByUsername(registerRequest.username());
+    @Transactional
+    public ResponseEntity<Map<String, String>> registerUser(@Valid @RequestBody RegisterRequest request) {
+        String username = request.username().trim();
 
-        if (existingUser.isPresent()) {
-            return ResponseEntity.status(409).body("Username already exists.");
+        if (userRepository.findByUsername(username).isPresent()) {
+            throw new ConflictException("That username is already taken.");
         }
 
-        // If email provided, validate format and uniqueness
-        if (registerRequest.email() != null && !registerRequest.email().isBlank()) {
-            String email = registerRequest.email().trim();
-            if (!isValidEmail(email)) {
-                return ResponseEntity.badRequest().body("Invalid email format.");
-            }
-            if (userRepository.findByEmail(email).isPresent()) {
-                return ResponseEntity.status(409).body("Email already in use.");
-            }
+        String email = request.email() == null ? null : request.email().trim();
+        if (email != null && !email.isBlank() && userRepository.findByEmail(email).isPresent()) {
+            throw new ConflictException("That email address is already registered.");
         }
 
+        User user = new User();
+        user.setUsername(username);
+        user.setPassword(passwordEncoder.encode(request.password()));
+        user.setEmail(email);
+        // Role and active status are set by the server, never taken from the request.
+        user.setRole("USER");
+        user.setActive(true);
 
-        // Encode the password before saving
-        User newUser = new User();
-        newUser.setUsername(registerRequest.username());
-        newUser.setPassword(passwordEncoder.encode(registerRequest.password()));
+        User saved = userRepository.save(user);
+        categoryService.seedDefaultsFor(saved);
 
-        // Set optional fields if provided
-        if (registerRequest.email() != null) {
-            newUser.setEmail(registerRequest.email());
-        }
-
-        // role: default to 'USER' if not provided
-        if (registerRequest.role() != null) {
-            newUser.setRole(registerRequest.role());
-        } else {
-            newUser.setRole("USER");
-        }
-
-        // active: default to true if not provided
-        if (registerRequest.active() != null) {
-            newUser.setActive(registerRequest.active());
-        } else {
-            newUser.setActive(true);
-        }
-
-        userRepository.save(newUser);
-
-        return ResponseEntity.ok("User registered successfully.");
-    }
-
-    private boolean isValidEmail(String email) {
-        // Simple regex for basic validation
-        String regex = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$";
-        return Pattern.compile(regex).matcher(email).matches();
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(Map.of("message", "Account created. You can sign in now."));
     }
 }

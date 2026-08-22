@@ -3,6 +3,8 @@ package com.lokesh_codes.expense_tracker_backend.DTO;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+import com.lokesh_codes.expense_tracker_backend.entity.Frequency;
+
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
@@ -15,17 +17,13 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class TransactionDTO {
+public class RecurringTransactionDTO {
 
     private Integer id;
-
-    /** Set by the server from the authenticated user; ignored on input. */
-    private Integer userId;
 
     @NotNull(message = "Category is required")
     private Integer categoryId;
 
-    /** Convenience for clients so a list does not need a second lookup. */
     private String categoryName;
 
     @NotBlank(message = "Description is required")
@@ -41,12 +39,19 @@ public class TransactionDTO {
     @Size(min = 3, max = 3, message = "Currency must be a three-letter code")
     private String currency;
 
-    @NotNull(message = "Date is required")
-    private LocalDate date;
-
     @NotBlank(message = "Payment method is required")
     private String paymentMethod;
 
     @Size(max = 500, message = "Comments may be at most 500 characters")
     private String comments;
+
+    @NotNull(message = "Frequency is required")
+    private Frequency frequency;
+
+    @NotNull(message = "A start date is required")
+    private LocalDate nextRunDate;
+
+    private LocalDate endDate;
+
+    private boolean active = true;
 }
