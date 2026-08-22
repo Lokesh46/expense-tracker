@@ -79,6 +79,7 @@ apps/
   frontend/    Angular 20 · standalone components · lazy routes · Chart.js
 scripts/
   run-backend.mjs   Locates a JDK and launches Maven with the right flags
+  setup-db-env.mjs  Converts a provider's connection string into apps/backend/.env
   load-env.mjs      Reads apps/backend/.env for the --prod check
 ```
 
@@ -178,10 +179,21 @@ Neon shows a URL beginning `postgresql://` with the credentials embedded. Java
 cannot use that directly. Add the `jdbc:` prefix, take the credentials out of
 the URL, and keep `?sslmode=require`.
 
-Rather than doing that by hand, fill in the template and let the script check it:
+Rather than doing that by hand, paste the provider's string into the converter:
 
 ```bash
-cp apps/backend/.env.example apps/backend/.env
+npm run setup:db
+```
+
+It reads the string from stdin — so it stays out of shell history — splits it
+into the three values, adds the `jdbc:` prefix, keeps `sslmode`, and drops
+parameters the JDBC driver does not use (Neon appends `channel_binding`). It
+warns if you pasted a pooled `-pooler` host, which breaks prepared statements
+under Spring Boot's own connection pool.
+
+Then check it actually reaches the database:
+
+```bash
 npm run dev:api:prod
 ```
 

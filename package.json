@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "concurrently -n api,web -c cyan,magenta --kill-others-on-fail \"npm:dev:api\" \"npm:dev:web\"",
     "dev:api": "node scripts/run-backend.mjs",
+    "setup:db": "node scripts/setup-db-env.mjs",
     "dev:api:prod": "node scripts/run-backend.mjs --prod",
     "dev:web": "npm --workspace apps/frontend run start",
     "build": "npm run build:api && npm run build:web",
