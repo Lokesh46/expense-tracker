@@ -31,3 +31,9 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Local runtime state ###
+# Holds the H2 database *and* jwt-signing-key.json. The repository root ignores
+# this too, but this module is mirrored to its own repository where the root
+# .gitignore does not apply — and there the key would be committed.
+data/

@@ -48,6 +48,11 @@ public class GlobalExceptionHandler {
         return body(HttpStatus.CONFLICT, e.getMessage());
     }
 
+    @ExceptionHandler(TooManyRequestsException.class)
+    public ResponseEntity<Map<String, Object>> handleTooManyRequests(TooManyRequestsException e) {
+        return body(HttpStatus.TOO_MANY_REQUESTS, e.getMessage());
+    }
+
     /** Credentials that do not match, and unknown usernames, look identical to the caller. */
     @ExceptionHandler({ BadCredentialsException.class, UsernameNotFoundException.class })
     public ResponseEntity<Map<String, Object>> handleBadCredentials(Exception e) {

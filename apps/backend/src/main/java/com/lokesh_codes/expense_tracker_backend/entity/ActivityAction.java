@@ -23,6 +23,15 @@ public enum ActivityAction {
     ACCOUNT_SUSPENDED("Suspended"),
     ACCOUNT_REINSTATED("Reinstated"),
 
+    /**
+     * Bulk movement of a member's own data. Recorded as counts only -- never a
+     * description, an amount or a category name. The point of this table is that
+     * an administrator can see that a thousand rows left the account without
+     * being able to read what any of them said.
+     */
+    TRANSACTIONS_IMPORTED("Imported transactions"),
+    TRANSACTIONS_EXPORTED("Exported transactions"),
+
     EMAIL_CHANGED("Email changed"),
     PASSWORD_CHANGED("Password changed"),
     PASSWORD_RESET("Password reset by an administrator"),
