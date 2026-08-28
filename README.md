@@ -59,10 +59,24 @@ npm test             # run both test suites
 - **Recurring** — rent, subscriptions and standing orders. Rules run overnight and
   also catch up when you open your ledger, one period at a time, so a rule left
   dormant produces every entry it missed rather than a single lump.
-- **CSV import and export** — the parser copes with quoted fields, embedded
-  commas, escaped quotes, several date layouts, thousands separators and
-  parenthesised negatives, and reports bad rows individually instead of
-  rejecting a whole statement over one line.
+- **CSV import and export** — the parser copes with quoted fields (including
+  newlines inside them), escaped quotes, the byte-order mark Excel writes,
+  several date layouts, thousands separators and parenthesised negatives, and
+  reports bad rows individually instead of rejecting a whole statement over one
+  line. The uploaded file is held in memory and discarded; it is never written
+  to disk. See **CSV format** below.
+- **Duplicate detection** — every transaction carries a keyed fingerprint, so
+  importing the same statement twice flags the repeats instead of silently
+  doubling your ledger. Flagged rows are still imported and still count towards
+  totals until you review them, because two identical coffees on one day is a
+  thing that happens and only you can tell that apart from a double import.
+- **Filing rules** — say "descriptions containing *amazon* go to Shopping" and
+  imports file themselves. The first matching rule wins, so the order is
+  editable.
+- **Encrypted at rest** — descriptions and comments are encrypted with
+  AES-256-GCM before they reach the database. They stay searchable by whole
+  word through a keyed index, so filtering still happens in SQL rather than by
+  loading your whole ledger into memory.
 - **Users and roles** — two roles, admin and member. An admin manages accounts:
   who exists, what they may do, and what they have been doing. It grants no sight
   of anyone's money — see below.
@@ -158,6 +172,11 @@ and reads everything from the environment:
 | `FRONTEND_URL` | Allowed browser origins, comma-separated. Patterns such as `http://localhost:[*]` are accepted. |
 | `JWT_SIGNING_KEY` | The signing key itself, as a JWK. **Set this in production.** Without it the key is regenerated on every deploy and every signed-in user is silently logged out. |
 | `JWT_KEY_STORE` | Fallback path to a key file, used when `JWT_SIGNING_KEY` is unset. Fine locally; unreliable in a container, whose filesystem is wiped on redeploy. |
+| `DATA_ENCRYPTION_KEY` | Base64 32-byte key encrypting transaction descriptions and comments at rest. **Set this in production, and back it up.** Losing it makes every description and comment permanently unreadable; amounts, dates and categories survive. |
+| `DATA_KEY_STORE` | Fallback path to a key file, used when `DATA_ENCRYPTION_KEY` is unset. Fine locally; in a container the filesystem is wiped on redeploy, so each deploy would generate a key that cannot read the previous deploy'''s data. |
+| `CRYPTO_BACKFILL_ON_START` | Set to `true` for one boot after upgrading an existing database, to encrypt rows written before encryption existed and build their search index. Leave unset afterwards. |
+| `CSV_MAX_IMPORTS_PER_HOUR` | Per-account CSV import allowance. Defaults to 5; 0 disables the limit. |
+| `CSV_MAX_EXPORTS_PER_HOUR` | Per-account CSV export allowance. Defaults to 10; 0 disables the limit. |
 | `ADMIN_USERNAME` | A username to promote to admin on startup. See below. |
 | `MAX_FAILED_ATTEMPTS` | Failed sign-ins before lockout. Defaults to 5. |
 | `LOCKOUT_MINUTES` | How long a lockout lasts. Defaults to 15; 0 disables locking. |
@@ -205,11 +224,16 @@ The frontend's production API URL is compiled in, from
 |---|---|---|---|
 | `POST` | `/register` | — | Create an account (seeds starter categories) |
 | `POST` | `/authenticate` | — | Exchange credentials for a JWT |
-| `GET` | `/api/transactions` | Bearer | Search: `page`, `size`, `sort`, `categoryId`, `from`, `to`, `minAmount`, `maxAmount`, `paymentMethod`, `search` |
+| `GET` | `/api/transactions` | Bearer | Search: `page`, `size`, `sort`, `categoryId`, `from`, `to`, `minAmount`, `maxAmount`, `paymentMethod`, `search`, `type`, `possibleDuplicate` |
 | `POST` | `/api/transactions` | Bearer | Record one |
 | `GET/PUT/DELETE` | `/api/transactions/{id}` | Bearer | Single transaction |
 | `GET` | `/api/transactions/export` | Bearer | CSV of everything matching the same filters |
 | `POST` | `/api/transactions/import` | Bearer | Upload a CSV (multipart, max 5 MB) |
+| `PUT` | `/api/transactions/{id}/not-duplicate` | Bearer | Confirm a flagged row is genuine |
+| `GET/POST` | `/api/category-rules` | Bearer | List / create filing rules |
+| `GET` | `/api/category-rules/match-types` | Bearer | The match types and their wording |
+| `PUT/DELETE` | `/api/category-rules/{id}` | Bearer | Single rule |
+| `PUT` | `/api/category-rules/{id}/move-up` · `/move-down` | Bearer | Reorder; returns the whole list |
 | `GET/POST` | `/api/categories` | Bearer | List / create |
 | `GET/PUT/DELETE` | `/api/categories/{id}` | Bearer | Single category |
 | `GET/POST` | `/api/budgets` | Bearer | List (`?month=yyyy-MM`) / create |
@@ -256,6 +280,99 @@ A guard refusal is a `409` rather than a `400` because nothing about the request
 is malformed; it is the state of the system that forbids it. And a wrong current
 password when changing your own is a `409`, not a `401`: the request *is*
 authenticated, and a `401` would make the client throw away a valid token.
+
+---
+
+## CSV format
+
+**Most bank exports import as they are.** The header row is read and matched
+against the names banks actually use, so the columns can be in any order and
+called whatever the bank calls them. These are all imported without editing:
+
+| Bank | What makes it awkward |
+|---|---|
+| HSBC UK | Three columns, no header at all, debits negative |
+| Lloyds | Money split across `Debit Amount` and `Credit Amount` |
+| Monzo | Sixteen columns, a transaction id first, `Type` means "Card payment" |
+| Chase (US) | `Transaction Date`, and month-first dates |
+| HDFC (India) | `Narration`, `Withdrawal Amt.`, two-digit years |
+| Starling | Currency named only inside `Amount (GBP)` |
+
+Names recognised, per field:
+
+| Field | Recognised as |
+|---|---|
+| Date | `Date`, `Transaction Date`, `Txn Date`, `Trans Date`, `Booking Date`, `Posting Date`, `Post Date`, `Posted Date`, `Value Date`, `Value Dt` |
+| Description | `Description`, `Transaction Description`, `Narration`, `Particulars`, `Counter Party`, `Merchant`, `Payee`, `Name`, `Details`, `Reference` |
+| Amount | `Amount`, `Transaction Amount`, `Amount (GBP)`, `Local amount`, `Value` |
+| Money out | `Debit`, `Debit Amount`, `Withdrawal`, `Withdrawal Amt.`, `Paid out`, `Money out`, `Dr` |
+| Money in | `Credit`, `Credit Amount`, `Deposit`, `Deposit Amt.`, `Paid in`, `Money in`, `Cr` |
+| Category | `Category`, `Spending Category`, `Subcategory` |
+| Currency | `Currency`, `Local currency` |
+| Payment method | `Payment Method`, `Method`, and a `Type` column that does not hold a direction |
+| Comments | `Comments`, `Notes`, `Memo`, `Notes and #tags` |
+| Expense or income | `Type` holding Expense/Income, `Direction`, `Dr/Cr`, `In/Out` |
+
+Where two columns could fill one field, the more specific name wins rather than
+the earlier column — Monzo sends both `Name` ("Tesco") and `Description`
+("TESCO STORES 3421"), and the fuller text is what filing rules match against.
+The mapping is always reported back after an import, so a wrong guess is
+visible rather than buried in the results.
+
+A file with no recognisable header falls back to reading by position, in the
+layout this app exports:
+
+```
+Date,Description,Category,Amount,Currency,Payment Method,Comments,Type
+2026-08-10,Weekly shop,Groceries,42.75,GBP,Card,,Expense
+2026-08-11,Refund for returned item,Groceries,15.00,GBP,Card,,Income
+```
+
+Three columns with no header is read as `Date,Description,Amount`.
+
+### Two things a file cannot tell you
+
+**Which way round the date is.** `03/04/2026` is the 3rd of April in most of
+the world and the 4th of March in the US, and both parse. The import dialog
+asks; day-first is the default. If the file contains a date that proves the
+other order — `14/08` can only be day-first — the import says so rather than
+filing a year of spending into the wrong months in silence.
+
+**What currency it is in.** Most statements never say, because a bank has no
+reason to repeat it on every row. The dialog asks, defaulting to what the
+account already uses. A currency named inside the amount header, as in
+`Amount (GBP)`, wins over it.
+
+### Direction of money
+
+The amount is always stored positive; the direction is a separate field.
+
+1. Separate debit and credit columns, if the file has them.
+2. A direction column: `Expense`/`Income`, `Debit`/`Credit`, `In`/`Out`,
+   `Withdrawal`/`Deposit`, `Refund`.
+3. The sign of the amount — **but only when the file contains at least one
+   negative**. A statement of nothing but outgoings, all written positive, is
+   not a year of income.
+
+### Per-field rules
+
+| Field | Notes |
+|---|---|
+| Date | ISO, `dd/MM/yyyy`, `MM/dd/yyyy`, `dd-MM-yyyy`, `yyyy/MM/dd`, two-digit years, and `14 Aug 2026`. |
+| Description | Required, up to 200 characters. |
+| Category | Matched case-insensitively against categories you already have. A name you do not have is **not** created — the row is filed under `Uncategorised` and the name is reported back. A filing rule, if one matches the description, wins over this column. |
+| Amount | Currency symbols, thousands separators and parenthesised negatives are all tolerated. |
+| Payment method | Defaults to `Other`. |
+| Comments | Up to 500 characters. |
+
+A quoted field may contain commas, escaped quotes and newlines, and the
+byte-order mark Excel writes is stripped. A row that cannot be read is reported
+with its line number; the rest of the file still imports.
+
+On export, any value a spreadsheet would evaluate as a formula (`=`, `+`, `-`,
+`@`) is prefixed with an apostrophe so it is displayed rather than executed.
+Import strips that prefix back off, so a round trip returns what you wrote.
+Numbers are left alone.
 
 ---
 
