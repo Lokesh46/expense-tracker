@@ -15,9 +15,11 @@ public final class TransactionMapping {
                 transaction.getCategory().getName(),
                 transaction.getDescription(),
                 transaction.getAmount(),
+                transaction.getType(),
                 transaction.getCurrency(),
                 transaction.getDate(),
                 transaction.getPaymentMethod(),
-                transaction.getComments());
+                transaction.getComments(),
+                transaction.isPossibleDuplicate());
     }
 }

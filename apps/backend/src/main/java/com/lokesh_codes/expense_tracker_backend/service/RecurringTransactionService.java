@@ -40,15 +40,18 @@ public class RecurringTransactionService {
     private final TransactionRepository transactionRepository;
     private final CategoryService categoryService;
     private final CurrentUserService currentUser;
+    private final TransactionIndexer indexer;
 
     public RecurringTransactionService(RecurringTransactionRepository recurringRepository,
             TransactionRepository transactionRepository,
             CategoryService categoryService,
-            CurrentUserService currentUser) {
+            CurrentUserService currentUser,
+            TransactionIndexer indexer) {
         this.recurringRepository = recurringRepository;
         this.transactionRepository = transactionRepository;
         this.categoryService = categoryService;
         this.currentUser = currentUser;
+        this.indexer = indexer;
     }
 
     @Transactional(readOnly = true)
@@ -153,6 +156,7 @@ public class RecurringTransactionService {
         transaction.setDate(date);
         transaction.setPaymentMethod(rule.getPaymentMethod());
         transaction.setComments(rule.getComments());
+        indexer.index(transaction);
         return transaction;
     }
 

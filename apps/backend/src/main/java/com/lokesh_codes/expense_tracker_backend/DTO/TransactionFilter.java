@@ -5,6 +5,8 @@ import java.time.LocalDate;
 
 import org.springframework.format.annotation.DateTimeFormat;
 
+import com.lokesh_codes.expense_tracker_backend.entity.TransactionType;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -30,4 +32,14 @@ public class TransactionFilter {
 
     /** Free text matched against description and comments, case-insensitively. */
     private String search;
+
+    /**
+     * Restricts to rows an import flagged as looking like duplicates, so they
+     * can be reviewed together. Null means no restriction, which is not the same
+     * as false.
+     */
+    private Boolean possibleDuplicate;
+
+    /** Restricts to expenses or to income. Null means both. */
+    private TransactionType type;
 }

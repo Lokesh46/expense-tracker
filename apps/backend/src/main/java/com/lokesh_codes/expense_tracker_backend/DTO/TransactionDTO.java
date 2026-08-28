@@ -3,6 +3,8 @@ package com.lokesh_codes.expense_tracker_backend.DTO;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+import com.lokesh_codes.expense_tracker_backend.entity.TransactionType;
+
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
@@ -37,6 +39,12 @@ public class TransactionDTO {
     @Digits(integer = 17, fraction = 2, message = "Amount may have at most two decimal places")
     private BigDecimal amount;
 
+    /**
+     * Money out or money in. Absent means an expense, so a client written before
+     * this existed keeps working and every stored row keeps its meaning.
+     */
+    private TransactionType type = TransactionType.EXPENSE;
+
     @NotBlank(message = "Currency is required")
     @Size(min = 3, max = 3, message = "Currency must be a three-letter code")
     private String currency;
@@ -49,4 +57,11 @@ public class TransactionDTO {
 
     @Size(max = 500, message = "Comments may be at most 500 characters")
     private String comments;
+
+    /**
+     * Whether an import thought this row looked like one already on file. Set by
+     * the server; a value sent by a client is ignored, since marking your own
+     * row as a duplicate is what the review endpoint is for.
+     */
+    private boolean possibleDuplicate;
 }
