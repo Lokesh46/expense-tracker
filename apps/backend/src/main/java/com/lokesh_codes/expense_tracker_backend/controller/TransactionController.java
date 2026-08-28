@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.lokesh_codes.expense_tracker_backend.DTO.DateOrder;
 import com.lokesh_codes.expense_tracker_backend.DTO.ImportResultDTO;
 import com.lokesh_codes.expense_tracker_backend.DTO.PageResponse;
 import com.lokesh_codes.expense_tracker_backend.DTO.TransactionDTO;
@@ -79,6 +80,17 @@ public class TransactionController {
         return ResponseEntity.ok(transactionService.updateTransaction(id, dto));
     }
 
+    /**
+     * Clears the duplicate flag on a row the owner has confirmed is genuine.
+     *
+     * <p>Its own endpoint rather than a field on the update payload, because
+     * this is a judgement about a row rather than a change to what the row says.
+     */
+    @PutMapping("/{id}/not-duplicate")
+    public ResponseEntity<TransactionDTO> markNotDuplicate(@PathVariable Integer id) {
+        return ResponseEntity.ok(transactionService.markNotDuplicate(id));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Integer id) {
         transactionService.deleteTransaction(id);
@@ -97,9 +109,26 @@ public class TransactionController {
                 .body(csv);
     }
 
+    /**
+     * Uploads a CSV.
+     *
+     * <p>Two things a statement usually does not say, and that cannot be worked
+     * out from it, are asked for rather than guessed.
+     *
+     * <p>{@code dateOrder} settles whether {@code 03/04/2026} is the 3rd of April
+     * or the 4th of March. Reading it the wrong way is not an error the user can
+     * see — it is a year of spending quietly filed into the wrong months.
+     *
+     * <p>{@code defaultCurrency} is used for files that name no currency, which
+     * is most of them: a bank has no reason to repeat it on every row of its own
+     * statement.
+     */
     @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<ImportResultDTO> importCsv(@RequestParam("file") MultipartFile file)
+    public ResponseEntity<ImportResultDTO> importCsv(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "dateOrder", defaultValue = "DAY_FIRST") DateOrder dateOrder,
+            @RequestParam(value = "defaultCurrency", defaultValue = "USD") String defaultCurrency)
             throws IOException {
-        return ResponseEntity.ok(csvService.importCsv(file));
+        return ResponseEntity.ok(csvService.importCsv(file, dateOrder, defaultCurrency));
     }
 }

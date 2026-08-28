@@ -27,6 +27,14 @@
       {{ changeLabel() }}
     </p>
 
+    @if (hasIncome()) {
+      <p class="headline-income">
+        <span class="eyebrow">Income</span>
+        <span class="figure">{{ money(income()) }}</span>
+        <span class="text-tertiary">not counted in the total above</span>
+      </p>
+    }
+
     @if (mixedCurrencies()) {
       <p class="mixed-warning">
         This month mixes currencies, so the total above adds unlike amounts. By currency:

@@ -110,15 +110,19 @@ describe('TransactionService', () => {
     expect(match.request.responseType).toBe('blob');
   });
 
-  it('uploads an import as multipart form data', () => {
+  it('uploads an import as multipart form data, with the chosen date order', () => {
     const file = new File(['Date,Description'], 'statement.csv', { type: 'text/csv' });
-    service.importCsv(file).subscribe();
+    service.importCsv(file, 'MONTH_FIRST', 'GBP').subscribe();
 
     const match = http.expectOne('/api/transactions/import');
-    match.flush({ imported: 1, skipped: 0, errors: [] });
+    match.flush({ imported: 1, skipped: 0, flagged: 0, errors: [], columnMapping: '' });
 
     expect(match.request.body instanceof FormData).toBe(true);
     expect((match.request.body as FormData).get('file')).toBe(file);
+    // Sent with the file rather than remembered on the server: it describes
+    // this file, not the account.
+    expect((match.request.body as FormData).get('dateOrder')).toBe('MONTH_FIRST');
+    expect((match.request.body as FormData).get('defaultCurrency')).toBe('GBP');
   });
 
   it('targets the right URL for each operation', () => {

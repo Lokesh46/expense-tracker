@@ -171,3 +171,36 @@
     justify-content: space-between;
   }
 }
+
+/*
+ * Income reads as money in. Amounts are stored positive either way, so without
+ * a mark on the row a credit is indistinguishable from a debit of the same size.
+ */
+.is-income {
+  color: var(--positive);
+}
+
+.field-hint {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+/*
+ * What the importer made of the file's columns. Shown on every import, not just
+ * failures: a mapping that read the wrong column is invisible in the results,
+ * and the person who uploaded the file is the only one who can spot it.
+ */
+.import-mapping {
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-left: 3px solid var(--rule);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  background: var(--surface-sunken);
+}
+
+.import-mapping p {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}

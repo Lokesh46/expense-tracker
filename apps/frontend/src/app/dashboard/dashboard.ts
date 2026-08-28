@@ -20,7 +20,13 @@ import { Budget } from '../core/models/budget.models';
 import { Transaction } from '../core/models/transaction.models';
 import { ThemeService } from '../core/services/theme.service';
 import { describeError } from '../core/utils/api-error';
-import { dominantCurrency, formatMoney, totalsByCurrency } from '../core/utils/money';
+import {
+  dominantCurrency,
+  expensesOnly,
+  formatMoney,
+  incomeOnly,
+  totalsByCurrency,
+} from '../core/utils/money';
 
 Chart.register(...registerables);
 
@@ -58,6 +64,23 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   protected readonly budgets = signal<Budget[]>([]);
   protected readonly isLoading = signal(true);
 
+  /**
+   * Spending is expenses only.
+   *
+   * Amounts are stored positive whichever way the money went, so summing the
+   * month wholesale counts a refund as though it were a purchase. Every figure
+   * below that means "spent" reads from here rather than from `current`.
+   */
+  protected readonly currentExpenses = computed(() => expensesOnly(this.current()));
+  protected readonly previousExpenses = computed(() => expensesOnly(this.previous()));
+  protected readonly currentIncome = computed(() => incomeOnly(this.current()));
+
+  protected readonly income = computed(() =>
+    this.currentIncome().reduce((sum, t) => sum + t.amount, 0)
+  );
+
+  protected readonly hasIncome = computed(() => this.currentIncome().length > 0);
+
   protected readonly currency = computed(() => dominantCurrency(this.current()));
 
   protected readonly monthLabel = computed(() =>
@@ -68,11 +91,11 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   );
 
   protected readonly total = computed(() =>
-    this.current().reduce((sum, t) => sum + t.amount, 0)
+    this.currentExpenses().reduce((sum, t) => sum + t.amount, 0)
   );
 
   protected readonly previousTotal = computed(() =>
-    this.previous().reduce((sum, t) => sum + t.amount, 0)
+    this.previousExpenses().reduce((sum, t) => sum + t.amount, 0)
   );
 
   /** Percentage change against the previous month, or null when there is no basis. */
@@ -89,16 +112,18 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
    * unlike things. The UI says so rather than quietly presenting a wrong number.
    */
   protected readonly mixedCurrencies = computed(
-    () => totalsByCurrency(this.current()).length > 1
+    () => totalsByCurrency(this.currentExpenses()).length > 1
   );
 
-  protected readonly currencyBreakdown = computed(() => totalsByCurrency(this.current()));
+  protected readonly currencyBreakdown = computed(() =>
+    totalsByCurrency(this.currentExpenses())
+  );
 
   protected readonly categorySlices = computed<CategorySlice[]>(() => {
     const colors = this.categoryService.colorById();
     const totals = new Map<number, { name: string; total: number }>();
 
-    for (const t of this.current()) {
+    for (const t of this.currentExpenses()) {
       const entry = totals.get(t.categoryId) ?? { name: t.categoryName, total: 0 };
       entry.total += t.amount;
       totals.set(t.categoryId, entry);
@@ -132,7 +157,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     const days = new Date(year, month, 0).getDate();
     const totals = new Array<number>(days).fill(0);
 
-    for (const t of this.current()) {
+    for (const t of this.currentExpenses()) {
       const day = Number(t.date.slice(8, 10));
       if (day >= 1 && day <= days) {
         totals[day - 1] += t.amount;

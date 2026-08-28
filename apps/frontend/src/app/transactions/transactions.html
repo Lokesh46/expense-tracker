@@ -5,7 +5,7 @@
   </div>
 
   <div class="row head-actions">
-    <button type="button" class="btn btn-sm" (click)="isImportOpen.set(true)">Import CSV</button>
+    <button type="button" class="btn btn-sm" (click)="openImport()">Import CSV</button>
     <button type="button" class="btn btn-sm" (click)="exportCsv()">Export</button>
     <button type="button" class="btn btn-primary btn-sm" (click)="openCreate()">
       Record expense
@@ -23,7 +23,7 @@
         class="input"
         type="search"
         formControlName="search"
-        placeholder="Description or notes"
+        placeholder="Whole words in description or notes"
       />
     </div>
 
@@ -68,14 +68,24 @@
     </div>
   </div>
 
-  @if (hasFilters()) {
-    <div class="filter-foot">
+  <div class="filter-foot">
+    @if (hasFilters()) {
       <span class="text-tertiary">{{ rangeLabel() }} matching</span>
       <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()">
         Clear filters
       </button>
-    </div>
-  }
+    }
+
+    <button
+      type="button"
+      class="btn btn-ghost btn-sm"
+      [class.is-active]="showOnlyDuplicates()"
+      [attr.aria-pressed]="showOnlyDuplicates()"
+      (click)="toggleDuplicateFilter()"
+    >
+      {{ showOnlyDuplicates() ? 'Show all rows' : 'Possible duplicates only' }}
+    </button>
+  </div>
 </section>
 
 <!-- ------------------------------------------------------------------- table -->
@@ -111,6 +121,11 @@
             <td class="figure date-cell">{{ row.date }}</td>
             <td>
               <span class="desc">{{ row.description }}</span>
+              @if (row.possibleDuplicate) {
+                <span class="dup-badge" title="Matches a transaction already on file. It still counts towards your totals.">
+                  Possible duplicate
+                </span>
+              }
               @if (row.comments) {
                 <span class="desc-note">{{ row.comments }}</span>
               }
@@ -122,8 +137,24 @@
               </span>
             </td>
             <td class="hide-sm text-secondary">{{ row.paymentMethod }}</td>
-            <td class="num">{{ money(row) }}</td>
+            <td class="num" [class.is-income]="row.type === 'INCOME'">
+              @if (row.type === 'INCOME') {
+                <span class="sr-only">Income</span>
+                <span aria-hidden="true">+</span>
+              }
+              {{ money(row) }}
+            </td>
             <td class="actions">
+              @if (row.possibleDuplicate) {
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-sm"
+                  [disabled]="clearingDuplicate() === row.id"
+                  (click)="keepAsGenuine(row)"
+                >
+                  Keep
+                </button>
+              }
               <button type="button" class="btn btn-ghost btn-sm" (click)="openEdit(row)">Edit</button>
               <button type="button" class="btn btn-danger btn-sm" (click)="pendingDelete.set(row)">
                 Delete
@@ -160,9 +191,15 @@
   @if (rows().length > 0) {
     <footer class="results-foot">
       <div class="totals">
-        <span class="eyebrow">This page</span>
+        <span class="eyebrow">Spent on this page</span>
         @for (total of pageTotals(); track total.currency) {
           <span class="figure total-value">{{ formatTotal(total) }}</span>
+        }
+        @if (pageIncome().length > 0) {
+          <span class="eyebrow">Income</span>
+          @for (total of pageIncome(); track total.currency) {
+            <span class="figure total-value is-income">{{ formatTotal(total) }}</span>
+          }
         }
       </div>
 
@@ -236,6 +273,18 @@
           @if (invalid('amount')) {
             <span class="field-error">Enter an amount above zero.</span>
           }
+        </div>
+
+        <div class="field">
+          <label for="type">Direction</label>
+          <select id="type" class="select" formControlName="type">
+            <option value="EXPENSE">Expense — money out</option>
+            <option value="INCOME">Income — money in</option>
+          </select>
+          <p class="field-hint">
+            Income is listed here but is not counted as spending on the overview or against a
+            budget.
+          </p>
         </div>
 
         <div class="field">
@@ -317,20 +366,81 @@
 @if (isImportOpen()) {
   <app-modal
     heading="Import from CSV"
-    description="Columns: Date, Description, Category, Amount, Currency, Payment Method, Notes."
+    description="Most bank exports work as they are — the column names are read from the header."
     (closed)="isImportOpen.set(false)"
   >
     <p class="form-note">
-      Only the first four columns are required. Dates may be ISO or dd/mm/yyyy, and any category
-      that does not exist yet will be created. Rows that cannot be read are reported rather than
-      stopping the import.
+      A date, a description and an amount are needed; everything else is optional. Common bank
+      column names are recognised, including separate debit and credit columns. Rows that cannot
+      be read are reported rather than stopping the import.
     </p>
+
+    <div class="field">
+      <label for="dateOrder">Dates in this file are written</label>
+      <select
+        id="dateOrder"
+        class="select"
+        [value]="dateOrder()"
+        (change)="dateOrder.set($any($event.target).value)"
+      >
+        <option value="DAY_FIRST">Day first — 14/08/2026</option>
+        <option value="MONTH_FIRST">Month first — 08/14/2026</option>
+      </select>
+      <p class="field-hint">
+        03/04/2026 is a valid date either way, so this cannot be worked out from the file. Getting
+        it wrong moves every ambiguous date to the wrong month.
+      </p>
+    </div>
+
+    <div class="field">
+      <label for="importCurrency">Amounts are in</label>
+      <select
+        id="importCurrency"
+        class="select"
+        [value]="importCurrency()"
+        (change)="importCurrency.set($any($event.target).value)"
+      >
+        @for (code of currencies; track code) {
+          <option [value]="code">{{ code }}</option>
+        }
+      </select>
+      <p class="field-hint">
+        Used only when the file does not say, which is most of the time — a bank rarely repeats
+        the currency on every row.
+      </p>
+    </div>
 
     <label class="dropzone">
       <input type="file" accept=".csv,text/csv" (change)="onFileSelected($event)" hidden />
       <span class="dropzone-title">{{ isImporting() ? 'Reading…' : 'Choose a CSV file' }}</span>
       <span class="dropzone-hint">Up to 5 MB</span>
     </label>
+
+    @if (importMapping()) {
+      <div class="import-mapping">
+        <p class="eyebrow">How the file was read</p>
+        <p>{{ importMapping() }}</p>
+      </div>
+    }
+
+    @if (importFlagged() > 0) {
+      <div class="import-duplicates">
+        <p class="eyebrow">Possible duplicates</p>
+        <p>
+          {{ importFlagged() }}
+          {{ importFlagged() === 1 ? 'row matches a transaction' : 'rows match transactions' }}
+          already on file. They were imported, and they
+          <strong>count towards your totals</strong> until you review them.
+        </p>
+        <button
+          type="button"
+          class="btn btn-sm"
+          (click)="reviewDuplicates()"
+        >
+          Review them now
+        </button>
+      </div>
+    }
 
     @if (importErrors().length > 0) {
       <div class="import-errors">

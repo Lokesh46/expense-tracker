@@ -5,6 +5,7 @@ import { Observable } from 'rxjs';
 import { API_BASE_URL } from '../tokens/api-base-url.token';
 import {
   CreateTransactionRequest,
+  DateOrder,
   ImportResult,
   PageResponse,
   Transaction,
@@ -46,6 +47,16 @@ export class TransactionService {
     return this.http.put<Transaction>(`${this.endpoint}/${id}`, payload);
   }
 
+  /**
+   * Records that a flagged row is genuine after all, clearing the badge.
+   *
+   * Two identical payments on one day are ordinary, and no rule can tell that
+   * apart from a statement imported twice — only the account holder can.
+   */
+  markNotDuplicate(id: number): Observable<Transaction> {
+    return this.http.put<Transaction>(`${this.endpoint}/${id}/not-duplicate`, {});
+  }
+
   delete(id: number): Observable<void> {
     return this.http.delete<void>(`${this.endpoint}/${id}`);
   }
@@ -58,9 +69,17 @@ export class TransactionService {
     });
   }
 
-  importCsv(file: File): Observable<ImportResult> {
+  /**
+   * Uploads a statement.
+   *
+   * Both options describe the file rather than the account, so they travel with
+   * it: the next statement may well come from a different bank.
+   */
+  importCsv(file: File, dateOrder: DateOrder, defaultCurrency: string): Observable<ImportResult> {
     const form = new FormData();
     form.append('file', file);
+    form.append('dateOrder', dateOrder);
+    form.append('defaultCurrency', defaultCurrency);
     return this.http.post<ImportResult>(`${this.endpoint}/import`, form);
   }
 
@@ -88,6 +107,7 @@ export class TransactionService {
     append('maxAmount', query.maxAmount);
     append('paymentMethod', query.paymentMethod);
     append('search', query.search?.trim());
+    append('possibleDuplicate', query.possibleDuplicate);
 
     if (query.sortBy) {
       params = params.set('sort', `${query.sortBy},${query.sortDir ?? 'desc'}`);

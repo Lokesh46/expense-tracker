@@ -53,6 +53,24 @@ export function totalsByCurrency(
 }
 
 /**
+ * Only the money that went out.
+ *
+ * Amounts are stored positive whichever way they went, so summing a list
+ * without this counts a refund as spending. Every figure that means "spent"
+ * goes through here.
+ */
+export function expensesOnly<T extends { type?: string }>(items: T[]): T[] {
+  // Absent type means expense: that is what every row written before the
+  // distinction existed was assumed to be.
+  return items.filter((item) => (item.type ?? 'EXPENSE') === 'EXPENSE');
+}
+
+/** Only the money that came in. */
+export function incomeOnly<T extends { type?: string }>(items: T[]): T[] {
+  return items.filter((item) => item.type === 'INCOME');
+}
+
+/**
  * The currency a user works in most, inferred from their transactions.
  *
  * Used to label figures that are genuinely a single number — a chart axis, a

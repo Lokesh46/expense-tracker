@@ -948,6 +948,48 @@ svg {
   margin-top: 2px;
 }
 
+/*
+ * Flagged duplicates are an advisory, not a failure: the rows imported fine.
+ * Accent rather than the negative colour, so it does not read as "something
+ * went wrong" when nothing did.
+ */
+.import-duplicates {
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  background: var(--accent-muted);
+}
+
+.import-duplicates p {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.import-duplicates .btn {
+  margin-top: var(--space-3);
+}
+
+.dup-badge {
+  display: inline-block;
+  margin-left: var(--space-2);
+  padding: 1px 6px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--accent-muted);
+  color: var(--accent);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+/* A filter toggle that is currently on. */
+.btn.is-active {
+  background: var(--accent-muted);
+  color: var(--accent);
+}
+
 /* --- shared page furniture --- */
 
 .head-actions {
