@@ -39,6 +39,7 @@ export class SidebarComponent {
     { path: '/budgets', label: 'Budgets', icon: 'M12 3v18M3 12h18M7.5 7.5l9 9M16.5 7.5l-9 9' },
     { path: '/categories', label: 'Categories', icon: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z' },
     { path: '/recurring', label: 'Recurring', icon: 'M3 12a9 9 0 0 1 15-6.7L21 8M21 12a9 9 0 0 1-15 6.7L3 16M21 4v4h-4M3 20v-4h4' },
+    { path: '/category-rules', label: 'Filing rules', icon: 'M4 6h16M4 12h10M4 18h6M16 15l3 3 4-5', hideOnMobile: true },
   ];
 
   protected readonly adminItems: NavItem[] = [

@@ -14,6 +14,7 @@ import com.lokesh_codes.expense_tracker_backend.exception.ConflictException;
 import com.lokesh_codes.expense_tracker_backend.exception.NotFoundException;
 import com.lokesh_codes.expense_tracker_backend.repository.BudgetRepository;
 import com.lokesh_codes.expense_tracker_backend.repository.CategoryRepository;
+import com.lokesh_codes.expense_tracker_backend.repository.CategoryRuleRepository;
 import com.lokesh_codes.expense_tracker_backend.repository.TransactionRepository;
 
 @Service
@@ -38,15 +39,20 @@ public class CategoryService {
     private final CategoryRepository categoryRepository;
     private final TransactionRepository transactionRepository;
     private final BudgetRepository budgetRepository;
+    // The repository rather than CategoryRuleService: that service already
+    // depends on this one, and injecting it back would be a cycle.
+    private final CategoryRuleRepository categoryRuleRepository;
     private final CurrentUserService currentUser;
 
     public CategoryService(CategoryRepository categoryRepository,
             TransactionRepository transactionRepository,
             BudgetRepository budgetRepository,
+            CategoryRuleRepository categoryRuleRepository,
             CurrentUserService currentUser) {
         this.categoryRepository = categoryRepository;
         this.transactionRepository = transactionRepository;
         this.budgetRepository = budgetRepository;
+        this.categoryRuleRepository = categoryRuleRepository;
         this.currentUser = currentUser;
     }
 
@@ -117,6 +123,13 @@ public class CategoryService {
 
         budgetRepository.findByUser_IdAndCategory_Id(category.getUser().getId(), id)
                 .ifPresent(budgetRepository::delete);
+
+        // A filing rule that points at a category which no longer exists cannot
+        // do anything but fail, so it goes with it. Safe to do silently: the
+        // category being deleted is the user's own decision, and the check above
+        // has already established nothing is filed under it.
+        categoryRuleRepository.deleteAll(
+                categoryRuleRepository.findByUser_IdAndCategory_Id(category.getUser().getId(), id));
 
         categoryRepository.delete(category);
     }

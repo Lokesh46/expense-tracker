@@ -51,6 +51,13 @@ export const routes: Routes = [
     title: 'Categories · Ledger',
   },
   {
+    path: 'category-rules',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./category-rules/category-rules').then((m) => m.CategoryRulesComponent),
+    title: 'Filing rules · Ledger',
+  },
+  {
     path: 'recurring',
     canActivate: [authGuard],
     loadComponent: () => import('./recurring/recurring').then((m) => m.RecurringComponent),

@@ -1,0 +1,173 @@
+<header class="row page-head rise rise-1">
+  <div>
+    <p class="eyebrow">Import</p>
+    <h1>Filing rules</h1>
+    <p class="text-secondary">
+      When you import a statement, the first rule whose text matches the description decides the
+      category. Rules are tried from the top down.
+    </p>
+  </div>
+
+  <div class="row head-actions">
+    <button
+      type="button"
+      class="btn btn-primary btn-sm"
+      [disabled]="categories().length === 0"
+      (click)="openCreate()"
+    >
+      Add rule
+    </button>
+  </div>
+</header>
+
+<section class="panel rise rise-2">
+  @if (isLoading()) {
+    <div class="empty"><p>Loading…</p></div>
+  } @else if (rules().length === 0) {
+    <div class="empty">
+      <h3>No rules yet</h3>
+      <p>
+        Without a rule, an imported row is filed under the category named in the file — or under
+        “Uncategorised” when the file names one you do not have.
+      </p>
+      <button
+        type="button"
+        class="btn btn-primary btn-sm"
+        [disabled]="categories().length === 0"
+        (click)="openCreate()"
+      >
+        Add your first rule
+      </button>
+    </div>
+  } @else {
+    <ol class="rule-list">
+      @for (rule of rules(); track rule.id) {
+        <li class="rule-row" [class.is-inactive]="!rule.active">
+          <div class="rule-order">
+            <button
+              type="button"
+              class="btn btn-ghost btn-icon"
+              aria-label="Move up"
+              [disabled]="isFirst(rule) || movingId() === rule.id"
+              (click)="move(rule, 'up')"
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              class="btn btn-ghost btn-icon"
+              aria-label="Move down"
+              [disabled]="isLast(rule) || movingId() === rule.id"
+              (click)="move(rule, 'down')"
+            >
+              ↓
+            </button>
+          </div>
+
+          <div class="rule-body">
+            <p class="rule-match">
+              <span class="text-tertiary">{{ matchLabel(rule.matchType) }}</span>
+              <span class="rule-pattern">{{ rule.pattern }}</span>
+            </p>
+            <p class="rule-target">
+              <span class="chip">
+                <span class="dot" [style.background]="categoryColor(rule.categoryId)"></span>
+                {{ rule.categoryName }}
+              </span>
+              @if (!rule.active) {
+                <span class="text-tertiary">Paused</span>
+              }
+            </p>
+          </div>
+
+          <div class="rule-actions">
+            <button type="button" class="btn btn-ghost btn-sm" (click)="openEdit(rule)">Edit</button>
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm is-danger"
+              (click)="pendingDelete.set(rule)"
+            >
+              Delete
+            </button>
+          </div>
+        </li>
+      }
+    </ol>
+  }
+</section>
+
+<!-- --------------------------------------------------------------- edit form -->
+@if (isFormOpen()) {
+  <app-modal
+    [heading]="editingId() === null ? 'Add rule' : 'Edit rule'"
+    (closed)="isFormOpen.set(false)"
+  >
+    <form [formGroup]="form" (ngSubmit)="save()">
+      <div class="field">
+        <label for="matchType">When the description</label>
+        <select id="matchType" class="select" formControlName="matchType">
+          @for (type of matchTypes(); track type.value) {
+            <option [value]="type.value">{{ type.label }}</option>
+          }
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="pattern">This text</label>
+        <input
+          id="pattern"
+          class="input"
+          type="text"
+          formControlName="pattern"
+          placeholder="e.g. amazon"
+          autocomplete="off"
+        />
+        <p class="field-hint">Case does not matter. Regular expressions are not supported.</p>
+        @if (form.controls.pattern.touched && form.controls.pattern.invalid) {
+          <p class="field-error">Enter between 2 and 120 characters.</p>
+        }
+      </div>
+
+      <div class="field">
+        <label for="categoryId">File it under</label>
+        <select id="categoryId" class="select" formControlName="categoryId">
+          @for (category of categories(); track category.id) {
+            <option [value]="category.id">{{ category.name }}</option>
+          }
+        </select>
+      </div>
+
+      <label class="field-check">
+        <input type="checkbox" formControlName="active" />
+        <span>Active</span>
+      </label>
+
+      <div class="form-actions">
+        <button type="button" class="btn" (click)="isFormOpen.set(false)">Cancel</button>
+        <button type="submit" class="btn btn-primary" [disabled]="isSaving()">
+          {{ isSaving() ? 'Saving…' : 'Save rule' }}
+        </button>
+      </div>
+    </form>
+  </app-modal>
+}
+
+<!-- ------------------------------------------------------------------ delete -->
+@if (pendingDelete(); as rule) {
+  <app-modal heading="Delete this rule?" (closed)="pendingDelete.set(null)">
+    <p>
+      Stop filing descriptions matching <strong>{{ rule.pattern }}</strong> under
+      {{ rule.categoryName }}?
+    </p>
+    <p class="text-secondary">
+      Transactions already imported keep the category they were given. Only future imports change.
+    </p>
+
+    <div class="form-actions">
+      <button type="button" class="btn" (click)="pendingDelete.set(null)">Keep it</button>
+      <button type="button" class="btn btn-primary is-danger" (click)="confirmDelete()">
+        Delete
+      </button>
+    </div>
+  </app-modal>
+}

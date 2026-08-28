@@ -1,0 +1,98 @@
+/*
+ * An ordered list, not a table. The order is the rule set's meaning — the first
+ * match wins — so the numbering and the move controls are the primary content,
+ * not decoration.
+ */
+.rule-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  counter-reset: rule;
+}
+
+.rule-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.rule-row:last-child {
+  border-bottom: none;
+}
+
+/* A paused rule stays legible but reads as switched off. */
+.rule-row.is-inactive .rule-body {
+  opacity: 0.55;
+}
+
+.rule-order {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.btn-icon {
+  min-width: 1.75rem;
+  padding: 0 0.35rem;
+  line-height: 1.4;
+}
+
+.rule-body p {
+  margin: 0;
+}
+
+.rule-match {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  font-size: var(--text-sm);
+}
+
+.rule-pattern {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+}
+
+.rule-target {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+  font-size: var(--text-xs);
+}
+
+.rule-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.field-hint {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.field-check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+@media (max-width: 560px) {
+  .rule-row {
+    grid-template-columns: auto 1fr;
+    row-gap: var(--space-2);
+  }
+
+  .rule-actions {
+    grid-column: 2;
+    justify-content: flex-start;
+  }
+}

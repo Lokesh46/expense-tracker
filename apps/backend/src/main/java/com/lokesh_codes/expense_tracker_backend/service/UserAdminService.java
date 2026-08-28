@@ -27,6 +27,7 @@ import com.lokesh_codes.expense_tracker_backend.exception.ConflictException;
 import com.lokesh_codes.expense_tracker_backend.exception.NotFoundException;
 import com.lokesh_codes.expense_tracker_backend.repository.BudgetRepository;
 import com.lokesh_codes.expense_tracker_backend.repository.CategoryRepository;
+import com.lokesh_codes.expense_tracker_backend.repository.CategoryRuleRepository;
 import com.lokesh_codes.expense_tracker_backend.repository.RecurringTransactionRepository;
 import com.lokesh_codes.expense_tracker_backend.repository.TransactionRepository;
 import com.lokesh_codes.expense_tracker_backend.repository.UserRepository;
@@ -55,6 +56,7 @@ public class UserAdminService {
     private final CategoryRepository categories;
     private final BudgetRepository budgets;
     private final RecurringTransactionRepository recurring;
+    private final CategoryRuleRepository categoryRules;
     private final ActivityLogService activity;
     private final CategoryService categoryService;
     private final CurrentUserService currentUser;
@@ -65,6 +67,7 @@ public class UserAdminService {
             CategoryRepository categories,
             BudgetRepository budgets,
             RecurringTransactionRepository recurring,
+            CategoryRuleRepository categoryRules,
             ActivityLogService activity,
             CategoryService categoryService,
             CurrentUserService currentUser,
@@ -74,6 +77,7 @@ public class UserAdminService {
         this.categories = categories;
         this.budgets = budgets;
         this.recurring = recurring;
+        this.categoryRules = categoryRules;
         this.activity = activity;
         this.categoryService = categoryService;
         this.currentUser = currentUser;
@@ -282,6 +286,9 @@ public class UserAdminService {
         transactions.deleteByUser_Id(id);
         recurring.deleteByUser_Id(id);
         budgets.deleteByUser_Id(id);
+        // Before categories: a rule points at one, so removing categories first
+        // fails on the foreign key.
+        categoryRules.deleteByUser_Id(id);
         categories.deleteByUser_Id(id);
         users.delete(user);
 

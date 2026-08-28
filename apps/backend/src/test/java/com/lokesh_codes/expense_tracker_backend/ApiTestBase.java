@@ -20,6 +20,7 @@ import com.lokesh_codes.expense_tracker_backend.entity.User;
 import com.lokesh_codes.expense_tracker_backend.repository.ActivityLogRepository;
 import com.lokesh_codes.expense_tracker_backend.repository.BudgetRepository;
 import com.lokesh_codes.expense_tracker_backend.repository.CategoryRepository;
+import com.lokesh_codes.expense_tracker_backend.repository.CategoryRuleRepository;
 import com.lokesh_codes.expense_tracker_backend.repository.RecurringTransactionRepository;
 import com.lokesh_codes.expense_tracker_backend.repository.TransactionRepository;
 import com.lokesh_codes.expense_tracker_backend.repository.UserRepository;
@@ -50,6 +51,8 @@ abstract class ApiTestBase {
     @Autowired
     private RecurringTransactionRepository recurring;
     @Autowired
+    protected CategoryRuleRepository categoryRules;
+    @Autowired
     private BudgetRepository budgets;
     @Autowired
     private CategoryRepository categories;
@@ -70,6 +73,8 @@ abstract class ApiTestBase {
         transactions.deleteAllInBatch();
         recurring.deleteAllInBatch();
         budgets.deleteAllInBatch();
+        // Before categories: a rule points at one.
+        categoryRules.deleteAllInBatch();
         categories.deleteAllInBatch();
         users.deleteAllInBatch();
         // Deliberately outlives its user in production, so it has to be cleared
