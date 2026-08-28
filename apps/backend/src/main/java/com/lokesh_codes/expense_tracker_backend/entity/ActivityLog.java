@@ -51,8 +51,11 @@ public class ActivityLog {
     @Column(name = "occurred_at", nullable = false)
     private Instant occurredAt;
 
+    // Written as varchar rather than left to Hibernate, which would make it
+    // an H2 ENUM pinned to today's values -- see SchemaRepair for what that
+    // costs when a value is added later.
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 30)
+    @Column(nullable = false, columnDefinition = "varchar(40)")
     private ActivityAction action;
 
     /**

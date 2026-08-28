@@ -45,8 +45,11 @@ public class User {
     @Column(nullable = false)
     private String password;
 
+    // Written as varchar rather than left to Hibernate, which would make it
+    // an H2 ENUM pinned to today's values -- see SchemaRepair for what that
+    // costs when a value is added later.
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, columnDefinition = "varchar(20)")
     private Role role;
 
     /** False when an administrator has switched the account off. */
