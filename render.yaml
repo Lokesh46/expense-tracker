@@ -46,6 +46,29 @@ services:
       - key: JWT_SIGNING_KEY
         sync: false
 
+      # Encrypts transaction descriptions and comments at rest. A base64 32-byte
+      # key: openssl rand -base64 32
+      #
+      # The application refuses to start in production without it, on purpose.
+      # The file fallback would otherwise generate a key onto the container
+      # filesystem, which Render wipes on every redeploy -- so the next deploy
+      # would be unable to read anything this one wrote, and the first sign of it
+      # would be a page of errors after a deploy that looked fine.
+      #
+      # BACK IT UP. Losing it makes every description and comment permanently
+      # unreadable; amounts, dates and categories survive.
+      - key: DATA_ENCRYPTION_KEY
+        sync: false
+
+      # Set to true for ONE boot after first deploying field encryption, to
+      # encrypt rows written before it existed and build their search index.
+      # Rows are readable either way, but an unindexed row cannot be found by
+      # search until it has been rewritten once. Unset it afterwards: leaving it
+      # on makes every boot page the whole transactions table to find nothing to
+      # do.
+      - key: CRYPTO_BACKFILL_ON_START
+        value: "false"
+
       # The username to promote to administrator.
       #
       # A fresh deployment has no administrator and no way to appoint one, since
