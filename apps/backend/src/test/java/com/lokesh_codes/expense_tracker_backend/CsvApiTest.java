@@ -14,7 +14,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;
 
+import com.lokesh_codes.expense_tracker_backend.DTO.TransactionFilter;
 import com.lokesh_codes.expense_tracker_backend.entity.ActivityAction;
+import com.lokesh_codes.expense_tracker_backend.service.TransactionCsvService;
 
 /**
  * CSV import has to cope with what banks actually export, and one unreadable
@@ -454,6 +456,26 @@ class CsvApiTest extends ApiTestBase {
 
         assertThat(exported).contains("Included");
         assertThat(exported).doesNotContain("Excluded");
+    }
+
+    @Test
+    @DisplayName("export does not run in a read-only transaction, because it writes an audit row")
+    void exportIsNotReadOnly() throws Exception {
+        // This assertion exists because the test suite cannot catch what it
+        // guards. H2 treats a read-only transaction as a hint and allows the
+        // insert; PostgreSQL refuses it. Marked read-only, export passed every
+        // test here and returned a 500 in production with "cannot execute
+        // INSERT in a read-only transaction".
+        //
+        // Checked on the annotation rather than by behaviour for the same
+        // reason: there is no behaviour to observe against H2.
+        var transactional = TransactionCsvService.class
+                .getMethod("export", TransactionFilter.class)
+                .getAnnotation(org.springframework.transaction.annotation.Transactional.class);
+
+        assertThat(transactional == null || !transactional.readOnly())
+                .as("export() writes an audit row, so it must not be marked readOnly")
+                .isTrue();
     }
 
     @Test

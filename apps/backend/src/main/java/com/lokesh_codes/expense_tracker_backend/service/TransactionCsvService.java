@@ -116,8 +116,19 @@ public class TransactionCsvService {
         this.maxExportsPerHour = maxExportsPerHour;
     }
 
-    /** Exports every transaction matching the filter, newest first. */
-    @Transactional(readOnly = true)
+    /**
+     * Exports every transaction matching the filter, newest first.
+     *
+     * <p>Deliberately not {@code @Transactional(readOnly = true)}, though it is
+     * overwhelmingly a read. It also writes an audit row at the end, and
+     * PostgreSQL enforces a read-only transaction where H2 treats it as a hint:
+     * marked read-only, this method worked in every test and returned a 500 in
+     * production with "cannot execute INSERT in a read-only transaction".
+     *
+     * <p>Nothing is lost by leaving it off. The query runs inside
+     * {@code TransactionService.findAll}, which is read-only itself, and the
+     * audit row gets its own transaction.
+     */
     public String export(TransactionFilter filter) {
         User user = currentUser.require();
         rateLimiter.require("export:" + user.getId(), maxExportsPerHour,
