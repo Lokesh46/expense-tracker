@@ -60,14 +60,25 @@ services:
       - key: DATA_ENCRYPTION_KEY
         sync: false
 
-      # Set to true for ONE boot after first deploying field encryption, to
-      # encrypt rows written before it existed and build their search index.
-      # Rows are readable either way, but an unindexed row cannot be found by
-      # search until it has been rewritten once. Unset it afterwards: leaving it
+      # Set to true for ONE boot after a release that adds a derived column, so
+      # rows written before it existed get one. Two have needed it so far: the
+      # search index that came with field encryption, and the merchant that
+      # category suggestions are keyed on.
+      #
+      # Rows are readable either way. What is missing until the backfill runs is
+      # everything derived from them -- an unindexed row cannot be found by
+      # search, and a row with no merchant teaches an import nothing about where
+      # you file that shop.
+      #
+      # Set back to "false" once the deploy logs say it is complete. Leaving it
       # on makes every boot page the whole transactions table to find nothing to
-      # do.
+      # do, which on a free instance is added to a cold start that is already
+      # slow.
+      #
+      # CURRENTLY ON: for the merchant backfill. Turn it off after the next
+      # successful deploy.
       - key: CRYPTO_BACKFILL_ON_START
-        value: "false"
+        value: "true"
 
       # The username to promote to administrator.
       #
