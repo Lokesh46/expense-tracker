@@ -204,3 +204,59 @@
   font-size: var(--text-xs);
   color: var(--text-secondary);
 }
+
+/*
+ * The import dialog puts the file first. Choosing one is why you opened it; the
+ * options are almost always already right, so they sit under the drop zone
+ * rather than in front of it.
+ */
+.import-options {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.options-note {
+  margin-top: var(--space-2);
+}
+
+/*
+ * Shown only when a PDF turns out to be locked. Asking every importer for a
+ * password up front is a question put to everybody to serve a few — and most
+ * statements are not even PDFs.
+ */
+.import-locked {
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  background: var(--accent-muted);
+}
+
+.import-locked p {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.unlock-row {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.unlock-row .input {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 480px) {
+  .import-options {
+    grid-template-columns: 1fr;
+  }
+
+  .unlock-row {
+    flex-direction: column;
+  }
+}

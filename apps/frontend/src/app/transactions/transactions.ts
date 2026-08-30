@@ -97,6 +97,28 @@ export class TransactionsComponent {
    */
   protected readonly importCurrency = signal<string>('GBP');
 
+  /**
+   * The password for a locked statement PDF.
+   *
+   * Held only until the upload is sent, and cleared afterwards. It never
+   * reaches the URL, the audit trail, or anywhere it could be read back.
+   */
+  protected readonly importPassword = signal('');
+
+  /**
+   * The file waiting on a password, kept so it need not be chosen again.
+   *
+   * The dialog does not ask for a password up front. Most statements are not
+   * locked and most are not even PDFs, so a password field sitting there by
+   * default is a question asked of everybody to serve a few. Instead the file is
+   * tried, and the field appears only when the answer comes back that it was
+   * needed.
+   */
+  private pendingFile: File | null = null;
+
+  /** Why a password is being asked for: not given, or given and wrong. */
+  protected readonly passwordPrompt = signal('');
+
   // --- duplicate review ---
   protected readonly showOnlyDuplicates = signal(false);
   protected readonly clearingDuplicate = signal<number | null>(null);
@@ -233,6 +255,9 @@ export class TransactionsComponent {
     this.importErrors.set([]);
     this.importFlagged.set(0);
     this.importMapping.set('');
+    this.importPassword.set('');
+    this.passwordPrompt.set('');
+    this.pendingFile = null;
     this.isImportOpen.set(true);
   }
 
@@ -429,17 +454,28 @@ export class TransactionsComponent {
   protected onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
-    if (!file) {
-      return;
+    // Allows the same file to be chosen again after changing an option.
+    input.value = '';
+    if (file) {
+      this.upload(file);
     }
+  }
 
+  /** Retries the file already chosen, now that a password has been typed. */
+  protected unlockAndImport(): void {
+    if (this.pendingFile) {
+      this.upload(this.pendingFile);
+    }
+  }
+
+  private upload(file: File): void {
     this.isImporting.set(true);
     this.importErrors.set([]);
     this.importFlagged.set(0);
     this.importMapping.set('');
 
     this.transactionService
-      .importCsv(file, this.dateOrder(), this.importCurrency())
+      .importStatement(file, this.dateOrder(), this.importCurrency(), this.importPassword())
       .subscribe({
         next: (result) => {
           this.isImporting.set(false);
@@ -465,13 +501,25 @@ export class TransactionsComponent {
           if (result.errors.length === 0 && result.flagged === 0) {
             this.isImportOpen.set(false);
           }
-          // Allow the same file to be chosen again after a fix.
-          input.value = '';
+          this.pendingFile = null;
+          this.passwordPrompt.set('');
+          this.importPassword.set('');
         },
         error: (err) => {
           this.isImporting.set(false);
-          input.value = '';
-          this.notifications.showError(describeError(err, 'Could not read that file.'));
+          const message = describeError(err, 'Could not read that file.');
+
+          // A locked PDF is not a failure to report and forget: it is a
+          // question. Keep the file, ask, and let the answer finish the job.
+          if (message.toLowerCase().includes('password')) {
+            this.pendingFile = file;
+            this.passwordPrompt.set(message);
+            return;
+          }
+
+          this.pendingFile = null;
+          this.passwordPrompt.set('');
+          this.notifications.showError(message);
         },
       });
   }

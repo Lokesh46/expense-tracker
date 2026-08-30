@@ -5,7 +5,7 @@
   </div>
 
   <div class="row head-actions">
-    <button type="button" class="btn btn-sm" (click)="openImport()">Import CSV</button>
+    <button type="button" class="btn btn-sm" (click)="openImport()">Import statement</button>
     <button type="button" class="btn btn-sm" (click)="exportCsv()">Export</button>
     <button type="button" class="btn btn-primary btn-sm" (click)="openCreate()">
       Record expense
@@ -365,56 +365,84 @@
 <!-- ------------------------------------------------------------------ import -->
 @if (isImportOpen()) {
   <app-modal
-    heading="Import from CSV"
-    description="Most bank exports work as they are — the column names are read from the header."
+    heading="Import a statement"
+    description="CSV or PDF. The columns are read from the file's own header, so most bank exports work as they are."
     (closed)="isImportOpen.set(false)"
   >
-    <p class="form-note">
-      A date, a description and an amount are needed; everything else is optional. Common bank
-      column names are recognised, including separate debit and credit columns. Rows that cannot
-      be read are reported rather than stopping the import.
-    </p>
-
-    <div class="field">
-      <label for="dateOrder">Dates in this file are written</label>
-      <select
-        id="dateOrder"
-        class="select"
-        [value]="dateOrder()"
-        (change)="dateOrder.set($any($event.target).value)"
-      >
-        <option value="DAY_FIRST">Day first — 14/08/2026</option>
-        <option value="MONTH_FIRST">Month first — 08/14/2026</option>
-      </select>
-      <p class="field-hint">
-        03/04/2026 is a valid date either way, so this cannot be worked out from the file. Getting
-        it wrong moves every ambiguous date to the wrong month.
-      </p>
-    </div>
-
-    <div class="field">
-      <label for="importCurrency">Amounts are in</label>
-      <select
-        id="importCurrency"
-        class="select"
-        [value]="importCurrency()"
-        (change)="importCurrency.set($any($event.target).value)"
-      >
-        @for (code of currencies; track code) {
-          <option [value]="code">{{ code }}</option>
-        }
-      </select>
-      <p class="field-hint">
-        Used only when the file does not say, which is most of the time — a bank rarely repeats
-        the currency on every row.
-      </p>
-    </div>
-
     <label class="dropzone">
-      <input type="file" accept=".csv,text/csv" (change)="onFileSelected($event)" hidden />
-      <span class="dropzone-title">{{ isImporting() ? 'Reading…' : 'Choose a CSV file' }}</span>
-      <span class="dropzone-hint">Up to 5 MB</span>
+      <input
+        type="file"
+        accept=".csv,.pdf,text/csv,application/pdf"
+        hidden
+        (change)="onFileSelected($event)"
+      />
+      <span class="dropzone-title">
+        {{ isImporting() ? 'Reading…' : 'Choose a statement' }}
+      </span>
+      <span class="dropzone-hint">CSV or PDF · up to 5 MB · the file is never saved</span>
     </label>
+
+    @if (passwordPrompt()) {
+      <div class="import-locked">
+        <p class="eyebrow">Locked PDF</p>
+        <p>{{ passwordPrompt() }}</p>
+        <div class="unlock-row">
+          <input
+            class="input"
+            type="password"
+            autocomplete="off"
+            placeholder="PDF password"
+            aria-label="PDF password"
+            [value]="importPassword()"
+            (input)="importPassword.set($any($event.target).value)"
+            (keyup.enter)="unlockAndImport()"
+          />
+          <button
+            type="button"
+            class="btn btn-primary btn-sm"
+            [disabled]="isImporting() || !importPassword()"
+            (click)="unlockAndImport()"
+          >
+            {{ isImporting() ? 'Opening…' : 'Unlock and import' }}
+          </button>
+        </div>
+        <p class="field-hint">Used to open the file and then discarded — never stored or logged.</p>
+      </div>
+    }
+
+    <div class="import-options">
+      <div class="field">
+        <label for="dateOrder">Dates read as</label>
+        <select
+          id="dateOrder"
+          class="select"
+          [value]="dateOrder()"
+          (change)="dateOrder.set($any($event.target).value)"
+        >
+          <option value="DAY_FIRST">Day first — 14/08/2026</option>
+          <option value="MONTH_FIRST">Month first — 08/14/2026</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="importCurrency">Amounts in</label>
+        <select
+          id="importCurrency"
+          class="select"
+          [value]="importCurrency()"
+          (change)="importCurrency.set($any($event.target).value)"
+        >
+          @for (code of currencies; track code) {
+            <option [value]="code">{{ code }}</option>
+          }
+        </select>
+      </div>
+    </div>
+
+    <p class="field-hint options-note">
+      Neither can be worked out from the file. 03/04/2026 is a valid date read either way, and most
+      statements never name their currency.
+    </p>
 
     @if (importMapping()) {
       <div class="import-mapping">

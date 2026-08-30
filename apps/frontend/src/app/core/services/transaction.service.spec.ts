@@ -110,9 +110,21 @@ describe('TransactionService', () => {
     expect(match.request.responseType).toBe('blob');
   });
 
+  it('omits the PDF password when there is not one', () => {
+    const file = new File(['Date,Description'], 'statement.csv', { type: 'text/csv' });
+    service.importStatement(file, 'DAY_FIRST', 'GBP', '').subscribe();
+
+    const match = http.expectOne('/api/transactions/import');
+    match.flush({ imported: 1, skipped: 0, flagged: 0, errors: [], columnMapping: '' });
+
+    // An empty value would read as a password that did not work, rather than
+    // as no password at all.
+    expect((match.request.body as FormData).has('pdfPassword')).toBe(false);
+  });
+
   it('uploads an import as multipart form data, with the chosen date order', () => {
     const file = new File(['Date,Description'], 'statement.csv', { type: 'text/csv' });
-    service.importCsv(file, 'MONTH_FIRST', 'GBP').subscribe();
+    service.importStatement(file, 'MONTH_FIRST', 'GBP', 's3cret').subscribe();
 
     const match = http.expectOne('/api/transactions/import');
     match.flush({ imported: 1, skipped: 0, flagged: 0, errors: [], columnMapping: '' });
@@ -123,6 +135,8 @@ describe('TransactionService', () => {
     // this file, not the account.
     expect((match.request.body as FormData).get('dateOrder')).toBe('MONTH_FIRST');
     expect((match.request.body as FormData).get('defaultCurrency')).toBe('GBP');
+    // Travels in the multipart body with the file it opens, never the URL.
+    expect((match.request.body as FormData).get('pdfPassword')).toBe('s3cret');
   });
 
   it('targets the right URL for each operation', () => {

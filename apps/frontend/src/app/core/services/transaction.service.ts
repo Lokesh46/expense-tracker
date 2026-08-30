@@ -70,16 +70,30 @@ export class TransactionService {
   }
 
   /**
-   * Uploads a statement.
+   * Uploads a statement, as CSV or as a PDF.
    *
-   * Both options describe the file rather than the account, so they travel with
-   * it: the next statement may well come from a different bank.
+   * All three options describe the file rather than the account, so they travel
+   * with it: the next statement may well come from a different bank, in a
+   * different format, and be locked.
+   *
+   * The PDF password is used to open the document and then dropped. It is never
+   * stored, never logged, and never put in the URL.
    */
-  importCsv(file: File, dateOrder: DateOrder, defaultCurrency: string): Observable<ImportResult> {
+  importStatement(
+    file: File,
+    dateOrder: DateOrder,
+    defaultCurrency: string,
+    pdfPassword: string
+  ): Observable<ImportResult> {
     const form = new FormData();
     form.append('file', file);
     form.append('dateOrder', dateOrder);
     form.append('defaultCurrency', defaultCurrency);
+    // Only when there is one: an empty value would be read as a password that
+    // did not work, rather than as no password at all.
+    if (pdfPassword) {
+      form.append('pdfPassword', pdfPassword);
+    }
     return this.http.post<ImportResult>(`${this.endpoint}/import`, form);
   }
 
