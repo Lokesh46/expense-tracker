@@ -45,6 +45,7 @@ export class SidebarComponent {
   protected readonly adminItems: NavItem[] = [
     { path: '/admin/users', label: 'Users', icon: 'M16 20v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V20M9.5 10.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7M17 11l2 2 4-4' },
     { path: '/admin/activity', label: 'Activity', icon: 'M3 12h4l2.5-7 4 14 2.5-7h5', hideOnMobile: true },
+    { path: '/admin/statement-preview', label: 'Statement preview', icon: 'M6 3h9l5 5v13H6zM15 3v5h5M9 13h7M9 17h5', hideOnMobile: true },
   ];
 
   private readonly tokenRole = toSignal(this.auth.role$, { initialValue: this.auth.getRole() });

@@ -1,0 +1,92 @@
+<header class="page-head rise rise-1">
+  <div class="page-title">
+    <p class="eyebrow">Admin · diagnostic</p>
+    <h1>Statement preview</h1>
+    <p class="text-secondary">
+      Reads a statement and shows what the importer would see — nothing is imported and nothing is
+      saved. For working out why a file will not import.
+    </p>
+  </div>
+</header>
+
+<section class="panel rise rise-2">
+  <div class="field">
+    <label for="pdfPassword">PDF password <span class="text-tertiary">(only if locked)</span></label>
+    <input
+      id="pdfPassword"
+      class="input"
+      type="password"
+      autocomplete="off"
+      [value]="password()"
+      (input)="password.set($any($event.target).value)"
+    />
+    <p class="field-hint">Used to open the file and then discarded. Never stored or logged.</p>
+  </div>
+
+  <label class="field-check">
+    <input type="checkbox" [checked]="redact()" (change)="redact.set($any($event.target).checked)" />
+    <span>
+      Redact values
+      <span class="text-tertiary">
+        — letters become x, digits become 9, in place. Column positions and the header survive
+        exactly, so the layout is still readable. Leave this on if you are going to share the
+        result.
+      </span>
+    </span>
+  </label>
+
+  <label class="dropzone">
+    <input type="file" accept=".csv,.pdf,text/csv,application/pdf" hidden (change)="onFileSelected($event)" />
+    <span class="dropzone-title">{{ isReading() ? 'Reading…' : 'Choose a statement (PDF or CSV)' }}</span>
+    <span class="dropzone-hint">Up to 5 MB · nothing is imported</span>
+  </label>
+
+  @if (fileName()) {
+    <p class="text-tertiary read-file">Read: {{ fileName() }}</p>
+  }
+</section>
+
+@if (result(); as preview) {
+  <section class="panel rise rise-3">
+    <div class="row summary-head">
+      <div>
+        <p class="eyebrow">What the importer found</p>
+        @if (collected()) {
+          <p class="collected">
+            Uploaded on another device and collected here. Held in memory only, for thirty
+            minutes, and only because it is redacted.
+          </p>
+        }
+        <p class="summary">
+          {{ preview.rowsDetected }}
+          {{ preview.rowsDetected === 1 ? 'row' : 'rows' }} under
+          {{ preview.headerLine >= 0 ? 'a header on line ' + (preview.headerLine + 1) : 'no header' }}.
+          @if (preview.redacted) {
+            <span class="redacted-badge">Redacted</span>
+          }
+        </p>
+      </div>
+      <button type="button" class="btn btn-ghost btn-sm" (click)="clear()">Clear</button>
+    </div>
+
+    <p class="mapping">{{ preview.columnMapping }}</p>
+  </section>
+
+  <section class="panel rise rise-3">
+    <div class="row summary-head">
+      <p class="eyebrow">Extracted text</p>
+      <button type="button" class="btn btn-sm" (click)="copy(asText())">Copy</button>
+    </div>
+    <pre class="extract">{{ asText() }}</pre>
+  </section>
+
+  @if (preview.csv) {
+    <section class="panel rise rise-3">
+      <div class="row summary-head">
+        <p class="eyebrow">As the importer would read it</p>
+        <button type="button" class="btn btn-sm" (click)="copy(preview.csv)">Copy</button>
+      </div>
+      <pre class="extract">{{ preview.csv }}</pre>
+    </section>
+  }
+}

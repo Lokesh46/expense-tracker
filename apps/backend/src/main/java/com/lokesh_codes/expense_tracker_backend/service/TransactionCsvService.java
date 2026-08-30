@@ -88,6 +88,7 @@ public class TransactionCsvService {
     private final RateLimiter rateLimiter;
     private final TransactionIndexer indexer;
     private final CategoryRuleService ruleService;
+    private final PdfStatementReader pdfReader;
     private final EntityManager entityManager;
     private final int maxImportsPerHour;
     private final int maxExportsPerHour;
@@ -100,6 +101,7 @@ public class TransactionCsvService {
             RateLimiter rateLimiter,
             TransactionIndexer indexer,
             CategoryRuleService ruleService,
+            PdfStatementReader pdfReader,
             EntityManager entityManager,
             @Value("${app.csv.max-imports-per-hour:5}") int maxImportsPerHour,
             @Value("${app.csv.max-exports-per-hour:10}") int maxExportsPerHour) {
@@ -111,6 +113,7 @@ public class TransactionCsvService {
         this.rateLimiter = rateLimiter;
         this.indexer = indexer;
         this.ruleService = ruleService;
+        this.pdfReader = pdfReader;
         this.entityManager = entityManager;
         this.maxImportsPerHour = maxImportsPerHour;
         this.maxExportsPerHour = maxExportsPerHour;
@@ -180,17 +183,32 @@ public class TransactionCsvService {
      */
     @Transactional
     public ImportResultDTO importCsv(MultipartFile file, DateOrder dateOrder,
-            String defaultCurrency) throws IOException {
+            String defaultCurrency, String pdfPassword) throws IOException {
         User user = currentUser.require();
         rateLimiter.require("import:" + user.getId(), maxImportsPerHour,
                 "You have imported several files in the last hour. Try again shortly.");
 
-        byte[] content = file.getBytes();
-        rejectIfNotText(content);
+        byte[] uploaded = file.getBytes();
 
         DateOrder order = dateOrder == null ? DateOrder.DAY_FIRST : dateOrder;
         String fallbackCurrency = normaliseCurrency(defaultCurrency);
         List<String> errors = new ArrayList<>();
+
+        // A PDF is turned into CSV and then imported as one. Everything past
+        // this point -- column names, dates, rules, duplicates -- is the same
+        // code for both, which is the point: a statement should not behave
+        // differently for having arrived as a PDF.
+        byte[] content;
+        if (PdfStatementReader.looksLikePdf(uploaded)) {
+            content = fromPdf(uploaded, pdfPassword, errors);
+            if (content.length == 0) {
+                return new ImportResultDTO(0, 0, 0, errors,
+                        "No transaction table could be read from that PDF.");
+            }
+        } else {
+            rejectIfNotText(uploaded);
+            content = uploaded;
+        }
 
         List<RawRow> rows = readRows(content, errors);
         if (rows.isEmpty()) {
@@ -644,6 +662,29 @@ public class TransactionCsvService {
             }
         }
         return flagged;
+    }
+
+    /**
+     * Reads a statement PDF and hands back the CSV it contains.
+     *
+     * <p>Returns an empty array when no table could be found, with the reason
+     * added to {@code errors}: a PDF that extracted cleanly but held nothing the
+     * importer recognises is a different problem from one that would not open,
+     * and saying "0 imported" for both helps nobody.
+     */
+    private byte[] fromPdf(byte[] uploaded, String password, List<String> errors) {
+        List<String> lines = pdfReader.readLines(uploaded, password);
+        PdfStatementTable.Extracted table = PdfStatementTable.toCsv(lines);
+
+        if (table.isEmpty()) {
+            errors.add(table.headerLine() < 0
+                    ? "No transaction table was found in that PDF. Its columns need to include "
+                            + "a date, a description and an amount under recognisable headings."
+                    : "A table was found in that PDF but none of its rows began with a date.");
+            return new byte[0];
+        }
+
+        return table.csv().getBytes(StandardCharsets.UTF_8);
     }
 
     /**

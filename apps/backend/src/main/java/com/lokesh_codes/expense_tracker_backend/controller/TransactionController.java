@@ -122,13 +122,20 @@ public class TransactionController {
      * <p>{@code defaultCurrency} is used for files that name no currency, which
      * is most of them: a bank has no reason to repeat it on every row of its own
      * statement.
+     *
+     * <p>{@code pdfPassword} opens a protected statement PDF. It is used to
+     * decrypt the upload in memory and then discarded — never stored, never
+     * logged, and deliberately absent from the audit trail, which records that
+     * an import happened and not what unlocked it.
      */
     @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ImportResultDTO> importCsv(
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "dateOrder", defaultValue = "DAY_FIRST") DateOrder dateOrder,
-            @RequestParam(value = "defaultCurrency", defaultValue = "USD") String defaultCurrency)
+            @RequestParam(value = "defaultCurrency", defaultValue = "USD") String defaultCurrency,
+            @RequestParam(value = "pdfPassword", required = false) String pdfPassword)
             throws IOException {
-        return ResponseEntity.ok(csvService.importCsv(file, dateOrder, defaultCurrency));
+        return ResponseEntity.ok(
+                csvService.importCsv(file, dateOrder, defaultCurrency, pdfPassword));
     }
 }

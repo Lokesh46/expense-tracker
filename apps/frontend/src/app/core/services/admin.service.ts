@@ -1,6 +1,6 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { Observable } from 'rxjs';
+import { map, Observable } from 'rxjs';
 
 import { PageResponse } from '../models/transaction.models';
 import {
@@ -12,6 +12,7 @@ import {
   UserDetail,
   UserQuery,
   UserSummary,
+  StatementPreview,
 } from '../models/user.models';
 import { API_BASE_URL } from '../tokens/api-base-url.token';
 
@@ -134,6 +135,57 @@ export class AdminService {
       params = params.set('size', String(size));
     }
     return params;
+  }
+
+  /**
+   * Describes an uploaded statement without importing it.
+   *
+   * A diagnostic for a file that will not import: it answers what the parser
+   * actually saw, which otherwise takes a redeploy with extra logging to find
+   * out. Nothing is written — the file is read in memory and dropped.
+   *
+   * `redact` replaces letters with x and digits with 9 in place, keeping the
+   * header and every column position intact. That form describes the layout
+   * exactly and the contents not at all, so it is the one to share when asking
+   * for help.
+   */
+  previewStatement(
+    file: File,
+    pdfPassword: string,
+    redact: boolean
+  ): Observable<StatementPreview> {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('redact', String(redact));
+    if (pdfPassword) {
+      form.append('pdfPassword', pdfPassword);
+    }
+    return this.http.post<StatementPreview>(
+      `${this.baseUrl}/api/admin/statement/preview`,
+      form
+    );
+  }
+
+  /**
+   * The last preview taken, if one is still being held.
+   *
+   * Lets a statement be uploaded from the device it is on — usually a phone —
+   * and read from the device you are actually working at. Only redacted
+   * previews are ever kept, and only for half an hour, in memory.
+   *
+   * Resolves to null when there is nothing waiting, which is the ordinary case.
+   */
+  lastStatementPreview(): Observable<StatementPreview | null> {
+    return this.http
+      .get<StatementPreview>(`${this.baseUrl}/api/admin/statement/last`, {
+        observe: 'response',
+      })
+      .pipe(map((response) => response.body ?? null));
+  }
+
+  /** Forgets the held preview now rather than waiting for it to expire. */
+  discardStatementPreview(): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/api/admin/statement/last`);
   }
 }
 

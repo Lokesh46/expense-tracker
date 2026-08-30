@@ -167,3 +167,22 @@ export const STATUS_LABELS: Readonly<Record<AccountStatus, string>> = {
   SUSPENDED: 'Suspended',
   LOCKED: 'Locked',
 };
+
+/**
+ * What the importer makes of a statement, without importing it.
+ *
+ * A diagnostic for a file that will not import. Nothing is stored: the upload is
+ * read in memory, described, and dropped.
+ */
+export interface StatementPreview {
+  /** The extracted text, one entry per line, with spacing preserved. */
+  lines: string[];
+  /** Index into `lines` of the row taken as the header, or -1 if none. */
+  headerLine: number;
+  rowsDetected: number;
+  /** The table rewritten as CSV — what the importer would actually read. */
+  csv: string;
+  columnMapping: string;
+  /** Whether values were replaced with placeholders. Layout survives; contents do not. */
+  redacted: boolean;
+}

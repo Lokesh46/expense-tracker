@@ -91,6 +91,18 @@ export const routes: Routes = [
     title: 'Account · Ledger',
   },
   {
+    // A temporary diagnostic: the backend endpoint it calls is off unless
+    // app.admin.statement-preview is switched on, so the page reports a 404
+    // rather than working when the tool is not meant to be available.
+    path: 'admin/statement-preview',
+    canActivate: [authGuard, adminGuard],
+    loadComponent: () =>
+      import('./admin/statement-preview/statement-preview').then(
+        (m) => m.StatementPreviewComponent
+      ),
+    title: 'Statement preview · Ledger',
+  },
+  {
     path: 'admin/activity',
     canActivate: [authGuard, adminGuard],
     loadComponent: () => import('./admin/activity/activity').then((m) => m.AdminActivityComponent),
