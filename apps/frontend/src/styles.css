@@ -953,7 +953,8 @@ svg {
  * Accent rather than the negative colour, so it does not read as "something
  * went wrong" when nothing did.
  */
-.import-duplicates {
+.import-duplicates,
+.import-review {
   margin-top: var(--space-4);
   padding: var(--space-3) var(--space-4);
   border-left: 3px solid var(--accent);
@@ -961,13 +962,15 @@ svg {
   background: var(--accent-muted);
 }
 
-.import-duplicates p {
+.import-duplicates p,
+.import-review p {
   margin: var(--space-2) 0 0;
   font-size: var(--text-sm);
   color: var(--text-secondary);
 }
 
-.import-duplicates .btn {
+.import-duplicates .btn,
+.import-review .btn {
   margin-top: var(--space-3);
 }
 

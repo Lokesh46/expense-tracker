@@ -4,6 +4,7 @@ import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 
 import { AccountService } from '../../core/services/account.service';
 import { AuthService } from '../../core/services/auth.service';
+import { ReviewService } from '../../core/services/review.service';
 import { ThemeService } from '../../core/services/theme.service';
 
 interface NavItem {
@@ -18,6 +19,14 @@ interface NavItem {
    * because every account's detail page links to it.
    */
   hideOnMobile?: boolean;
+  /**
+   * Marks the entry that carries the review count.
+   *
+   * A flag rather than the number itself: the count changes as you work through
+   * the queue, and a value copied into this list at construction would be stale
+   * the moment anything was approved.
+   */
+  showsReviewCount?: boolean;
 }
 
 @Component({
@@ -31,6 +40,7 @@ export class SidebarComponent {
   private readonly auth = inject(AuthService);
   private readonly accountService = inject(AccountService);
   private readonly router = inject(Router);
+  private readonly reviewService = inject(ReviewService);
   protected readonly themeService = inject(ThemeService);
 
   protected readonly navItems: NavItem[] = [
@@ -39,6 +49,7 @@ export class SidebarComponent {
     { path: '/budgets', label: 'Budgets', icon: 'M12 3v18M3 12h18M7.5 7.5l9 9M16.5 7.5l-9 9' },
     { path: '/categories', label: 'Categories', icon: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z' },
     { path: '/recurring', label: 'Recurring', icon: 'M3 12a9 9 0 0 1 15-6.7L21 8M21 12a9 9 0 0 1-15 6.7L3 16M21 4v4h-4M3 20v-4h4' },
+    { path: '/review', label: 'Needs review', icon: 'M9 12l2 2 4-4M12 3l7.8 4.5v9L12 21l-7.8-4.5v-9z', showsReviewCount: true },
     { path: '/category-rules', label: 'Filing rules', icon: 'M4 6h16M4 12h10M4 18h6M16 15l3 3 4-5', hideOnMobile: true },
   ];
 
@@ -64,7 +75,14 @@ export class SidebarComponent {
     return profile ? profile.role === 'ADMIN' : this.tokenRole() === 'ADMIN';
   });
 
+  /** How many imported rows are still waiting to be reviewed. */
+  protected readonly reviewWaiting = this.reviewService.waiting;
+
   constructor() {
+    // The badge would otherwise only appear after visiting the screen it points
+    // at, which is the wrong way round for a prompt.
+    this.reviewService.refreshCount().subscribe({ error: () => undefined });
+
     // Asked for once per session. It also settles the case the token cannot: an
     // administrator who was demoted while this tab was open.
     this.accountService.load().subscribe({

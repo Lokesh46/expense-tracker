@@ -24,7 +24,26 @@ export interface Transaction {
    * is worth a second look.
    */
   possibleDuplicate: boolean;
+
+  /**
+   * Whether you have agreed with the category, or an import guessed it and is
+   * still waiting to be told. A guessed row counts towards totals like any
+   * other — the flag only means it has not been looked at.
+   */
+  categoryConfirmed: boolean;
+
+  /** How the category was arrived at, so a surprising one can explain itself. */
+  categorySource: CategorySource;
 }
+
+/**
+ * How a transaction came to be filed where it is.
+ *
+ * Only `HISTORY` and `NONE` normally appear unconfirmed: the others are either
+ * an instruction (`RULE`), an explicit name in the file (`FILE`), or a choice
+ * made by hand (`MANUAL`).
+ */
+export type CategorySource = 'RULE' | 'HISTORY' | 'FILE' | 'MANUAL' | 'NONE';
 
 /**
  * Which way the money went. The amount is stored as a positive number either
@@ -99,6 +118,12 @@ export interface ImportResult {
   skipped: number;
   /** Rows written that match one already on file. A subset of `imported`. */
   flagged: number;
+  /**
+   * Rows whose category was guessed and is waiting to be approved or changed.
+   * Also a subset of `imported`: the guess is applied, so totals are roughly
+   * right immediately and get more right as the queue is worked through.
+   */
+  needsReview: number;
   errors: string[];
   /**
    * How the file's columns were understood, in plain words. Always shown: a

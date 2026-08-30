@@ -260,3 +260,28 @@
     flex-direction: column;
   }
 }
+
+/*
+ * A category the import guessed at.
+ *
+ * Dashed rather than coloured or badged: the guess is probably right, and a row
+ * that shouts at you for being unreviewed would make a whole imported statement
+ * look like a list of errors. The mark beside it is the way to settle it.
+ */
+.chip.is-guessed {
+  border-style: dashed;
+}
+
+.guessed-note {
+  margin-left: var(--space-1);
+  padding: 0 0.3rem;
+  border-radius: var(--radius-full);
+  color: var(--text-tertiary);
+  font-size: var(--text-2xs);
+  text-decoration: none;
+}
+
+.guessed-note:hover {
+  color: var(--accent);
+  background: var(--accent-muted);
+}

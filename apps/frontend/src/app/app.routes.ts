@@ -39,6 +39,12 @@ export const routes: Routes = [
     title: 'Ledger · Ledger',
   },
   {
+    path: 'review',
+    canActivate: [authGuard],
+    loadComponent: () => import('./review/review').then((m) => m.ReviewComponent),
+    title: 'Needs review · Ledger',
+  },
+  {
     path: 'budgets',
     canActivate: [authGuard],
     loadComponent: () => import('./budgets/budgets').then((m) => m.BudgetsComponent),

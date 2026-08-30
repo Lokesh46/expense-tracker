@@ -2,8 +2,10 @@ import { Component, computed, effect, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { debounceTime, distinctUntilChanged } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Router, RouterLink } from '@angular/router';
 
 import { CategoryService } from '../core/services/category.service';
+import { ReviewService } from '../core/services/review.service';
 import { NotificationService } from '../core/services/notification.service';
 import { TransactionService } from '../core/services/transaction.service';
 import {
@@ -28,13 +30,15 @@ type SortKey = 'date' | 'amount' | 'description';
 @Component({
   selector: 'app-transactions',
   standalone: true,
-  imports: [ReactiveFormsModule, ModalComponent],
+  imports: [ReactiveFormsModule, ModalComponent, RouterLink],
   templateUrl: './transactions.html',
   styleUrl: './transactions.css',
 })
 export class TransactionsComponent {
   private readonly transactionService = inject(TransactionService);
   private readonly categoryService = inject(CategoryService);
+  private readonly reviewService = inject(ReviewService);
+  private readonly router = inject(Router);
   private readonly notifications = inject(NotificationService);
   private readonly fb = inject(FormBuilder);
 
@@ -75,6 +79,15 @@ export class TransactionsComponent {
    * nothing on screen explains why.
    */
   protected readonly importFlagged = signal(0);
+
+  /**
+   * How many rows the last import filed by guessing.
+   *
+   * Reported for the same reason as the flagged count: the guesses are applied,
+   * so the totals on this page already include them, and the only honest thing
+   * is to say so and offer the way to settle them.
+   */
+  protected readonly importNeedsReview = signal(0);
 
   /** How the last import understood the file's columns, shown back to the user. */
   protected readonly importMapping = signal('');
@@ -254,6 +267,7 @@ export class TransactionsComponent {
     this.importCurrency.set(this.rows()[0]?.currency ?? 'GBP');
     this.importErrors.set([]);
     this.importFlagged.set(0);
+    this.importNeedsReview.set(0);
     this.importMapping.set('');
     this.importPassword.set('');
     this.passwordPrompt.set('');
@@ -273,6 +287,12 @@ export class TransactionsComponent {
     this.showOnlyDuplicates.set(true);
     this.page.set(0);
     this.load();
+  }
+
+  /** Closes the dialog and goes to settle what the import guessed. */
+  protected reviewCategories(): void {
+    this.isImportOpen.set(false);
+    this.router.navigate(['/review']);
   }
 
   /** Confirms a flagged row is genuine, so the badge stops following it around. */
@@ -472,6 +492,7 @@ export class TransactionsComponent {
     this.isImporting.set(true);
     this.importErrors.set([]);
     this.importFlagged.set(0);
+    this.importNeedsReview.set(0);
     this.importMapping.set('');
 
     this.transactionService
@@ -481,6 +502,7 @@ export class TransactionsComponent {
           this.isImporting.set(false);
           this.importErrors.set(result.errors);
           this.importFlagged.set(result.flagged);
+          this.importNeedsReview.set(result.needsReview);
           this.importMapping.set(result.columnMapping ?? '');
 
           if (result.imported > 0) {
@@ -488,6 +510,9 @@ export class TransactionsComponent {
               `Imported ${result.imported} transaction${result.imported === 1 ? '' : 's'}.`
             );
             this.categoryService.load().subscribe();
+            // The navigation badge is shared, and an import is the one thing
+            // that adds to the queue.
+            this.reviewService.refreshCount().subscribe({ error: () => undefined });
             this.load();
           }
           if (result.skipped > 0 && result.imported === 0) {
@@ -498,7 +523,7 @@ export class TransactionsComponent {
           // skipped, duplicates flagged, or a column mapping worth checking
           // before the results are trusted. Closing it would leave the totals
           // changed with no explanation on screen.
-          if (result.errors.length === 0 && result.flagged === 0) {
+          if (result.errors.length === 0 && result.flagged === 0 && result.needsReview === 0) {
             this.isImportOpen.set(false);
           }
           this.pendingFile = null;

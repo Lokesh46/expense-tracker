@@ -1,0 +1,172 @@
+<header class="row page-head rise rise-1">
+  <div>
+    <p class="eyebrow">Import</p>
+    <h1>Needs review</h1>
+    <p class="text-secondary">
+      Rows an import filed by guessing. They already count towards your totals — approving one
+      only records that you agree, which is what lets the next statement file itself.
+    </p>
+  </div>
+
+  @if (merchants().length > 0) {
+    <div class="row head-actions">
+      <button
+        type="button"
+        class="btn btn-secondary btn-sm"
+        [disabled]="isApprovingAll()"
+        (click)="approveAll()"
+      >
+        {{ isApprovingAll() ? 'Approving…' : 'Approve all ' + merchantsTotal() }}
+      </button>
+    </div>
+  }
+</header>
+
+<section class="panel rise rise-2">
+  @if (isLoading()) {
+    <div class="empty"><p>Loading…</p></div>
+  } @else if (merchants().length === 0) {
+    <div class="empty">
+      <h3>Nothing to review</h3>
+      <p>
+        Every transaction is filed where you have agreed it should be. Import a statement and
+        anything the app is unsure about will collect here.
+      </p>
+    </div>
+  } @else {
+    <p class="queue-summary">
+      <strong>{{ merchantsTotal() }}</strong>
+      {{ merchantsTotal() === 1 ? 'merchant' : 'merchants' }} ·
+      <strong>{{ transactionsTotal() }}</strong>
+      {{ transactionsTotal() === 1 ? 'transaction' : 'transactions' }}
+      @if (hidden() > 0) {
+        <span class="text-tertiary">
+          — showing the {{ merchants().length }} largest, {{ hidden() }} not listed
+        </span>
+      }
+    </p>
+
+    <ul class="merchant-list">
+      @for (group of merchants(); track group.merchantHash) {
+        <li class="merchant-row" [class.is-busy]="busy() === group.merchantHash">
+          <div class="merchant-main">
+            <div class="merchant-identity">
+              <p class="merchant-name" [class.is-unnamed]="!group.merchantName">
+                {{ displayName(group) }}
+              </p>
+              <p class="merchant-meta text-tertiary">
+                {{ group.transactionCount }}
+                {{ group.transactionCount === 1 ? 'transaction' : 'transactions' }}
+                @if (totalsOf(group)) {
+                  · {{ totalsOf(group) }}
+                }
+              </p>
+            </div>
+
+            <div class="merchant-suggestion">
+              @if (group.suggestedCategoryName) {
+                <span class="chip">
+                  <span
+                    class="dot"
+                    [style.background]="categoryColor(group.suggestedCategoryId)"
+                  ></span>
+                  {{ group.suggestedCategoryName }}
+                </span>
+              }
+              @if (reasonFor(group); as reason) {
+                <span class="merchant-reason text-tertiary">{{ reason }}</span>
+              }
+            </div>
+
+            <div class="row merchant-actions">
+              <button
+                type="button"
+                class="btn btn-primary btn-sm"
+                [disabled]="busy() === group.merchantHash || editing() === group.merchantHash"
+                (click)="approve(group)"
+              >
+                Approve
+              </button>
+              <button
+                type="button"
+                class="btn btn-ghost btn-sm"
+                [disabled]="busy() === group.merchantHash || categories().length === 0"
+                (click)="startEditing(group)"
+              >
+                Change
+              </button>
+            </div>
+          </div>
+
+          @if (editing() === group.merchantHash) {
+            <div class="merchant-edit">
+              <label class="field">
+                <span class="field-label">File these under</span>
+                <select
+                  class="input"
+                  [value]="chosenCategoryId()"
+                  (change)="onCategoryChosen($event)"
+                >
+                  <option value="">Choose a category…</option>
+                  @for (category of categories(); track category.id) {
+                    <option [value]="category.id">{{ category.name }}</option>
+                  }
+                </select>
+              </label>
+
+              @if (canRemember(group)) {
+                <label class="remember">
+                  <input
+                    type="checkbox"
+                    [checked]="rememberChoice()"
+                    (change)="onRememberChanged($event)"
+                  />
+                  <span>
+                    Always file <strong>{{ group.merchantName }}</strong> here
+                    <span class="text-tertiary">
+                      — adds a filing rule, so it never comes back to this list
+                    </span>
+                  </span>
+                </label>
+              } @else {
+                <p class="field-hint">
+                  These have no merchant name to match on, so this cannot be remembered as a
+                  rule — it applies to these {{ group.transactionCount }} only.
+                </p>
+              }
+
+              <div class="row edit-actions">
+                <button
+                  type="button"
+                  class="btn btn-primary btn-sm"
+                  [disabled]="!chosenCategoryId() || busy() === group.merchantHash"
+                  (click)="saveCategory(group)"
+                >
+                  {{ busy() === group.merchantHash ? 'Moving…' : 'Move ' + group.transactionCount }}
+                </button>
+                <button type="button" class="btn btn-ghost btn-sm" (click)="cancelEditing()">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          }
+
+          @if (group.samples.length > 0) {
+            <button type="button" class="samples-toggle" (click)="toggleSamples(group)">
+              {{ expanded() === group.merchantHash ? 'Hide' : 'Show' }} what this matched
+            </button>
+            @if (expanded() === group.merchantHash) {
+              <!-- The first and last descriptions in the group. If two different
+                   shops have been merged into one name, this is where it shows. -->
+              <ul class="samples">
+                @for (sample of group.samples; track sample) {
+                  <li>{{ sample }}</li>
+                }
+              </ul>
+            }
+          }
+        </li>
+      }
+    </ul>
+  }
+</section>

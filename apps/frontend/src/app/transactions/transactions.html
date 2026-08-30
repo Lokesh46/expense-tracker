@@ -131,10 +131,15 @@
               }
             </td>
             <td>
-              <span class="chip">
+              <span class="chip" [class.is-guessed]="!row.categoryConfirmed">
                 <span class="dot" [style.background]="categoryColor(row.categoryId)"></span>
                 {{ row.categoryName }}
               </span>
+              @if (!row.categoryConfirmed) {
+                <!-- Quiet on purpose. The category may well be right; this only
+                     explains why it might not be, and where to settle it. -->
+                <a class="guessed-note" routerLink="/review" title="Filed by guessing — review">?</a>
+              }
             </td>
             <td class="hide-sm text-secondary">{{ row.paymentMethod }}</td>
             <td class="num" [class.is-income]="row.type === 'INCOME'">
@@ -448,6 +453,21 @@
       <div class="import-mapping">
         <p class="eyebrow">How the file was read</p>
         <p>{{ importMapping() }}</p>
+      </div>
+    }
+
+    @if (importNeedsReview() > 0) {
+      <div class="import-review">
+        <p class="eyebrow">Categories guessed</p>
+        <p>
+          {{ importNeedsReview() }}
+          {{ importNeedsReview() === 1 ? 'row was filed' : 'rows were filed' }} by guessing, and
+          {{ importNeedsReview() === 1 ? 'is' : 'are' }} grouped by merchant so you can settle
+          {{ importNeedsReview() === 1 ? 'it' : 'them' }} a shop at a time.
+        </p>
+        <button type="button" class="btn btn-sm" (click)="reviewCategories()">
+          Review categories
+        </button>
       </div>
     }
 

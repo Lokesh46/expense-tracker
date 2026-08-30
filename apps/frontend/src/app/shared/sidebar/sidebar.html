@@ -23,6 +23,11 @@
             <path [attr.d]="item.icon" />
           </svg>
           <span class="nav-label">{{ item.label }}</span>
+          @if (item.showsReviewCount && reviewWaiting() > 0) {
+            <span class="nav-badge" [attr.aria-label]="reviewWaiting() + ' waiting'">
+              {{ reviewWaiting() }}
+            </span>
+          }
         </a>
       </li>
     }
