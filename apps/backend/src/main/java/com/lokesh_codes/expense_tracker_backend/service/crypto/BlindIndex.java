@@ -91,6 +91,23 @@ public class BlindIndex {
         return digests;
     }
 
+    /**
+     * A keyed digest of one whole value, for grouping rather than searching.
+     *
+     * <p>Exposed so that a derived column which has to be matched exactly — a
+     * merchant, say — can be built from the same secret and the same primitive
+     * rather than growing a third HMAC implementation alongside this one and
+     * {@code TransactionFingerprint}.
+     *
+     * <p>Deterministic, which is the point: the same merchant must produce the
+     * same digest every month, or it cannot be grouped. That also means it is
+     * open to a guessing attack in a way the encryption beside it is not, and
+     * the key is what closes that off.
+     */
+    public String keyedDigest(String value) {
+        return value == null || value.isBlank() ? null : digest(value.toLowerCase(Locale.ROOT));
+    }
+
     private List<String> words(String value) {
         if (value == null || value.isBlank()) {
             return List.of();
