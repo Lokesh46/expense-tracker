@@ -3,6 +3,7 @@ package com.lokesh_codes.expense_tracker_backend.DTO;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+import com.lokesh_codes.expense_tracker_backend.entity.CategorySource;
 import com.lokesh_codes.expense_tracker_backend.entity.TransactionType;
 
 import jakarta.validation.constraints.DecimalMin;
@@ -64,4 +65,14 @@ public class TransactionDTO {
      * row as a duplicate is what the review endpoint is for.
      */
     private boolean possibleDuplicate;
+
+    /**
+     * Whether the owner has agreed with the category, or an import guessed it and
+     * is still waiting to be told. Set by the server; a client agrees with a
+     * category through the review endpoints, not by asserting it here.
+     */
+    private boolean categoryConfirmed = true;
+
+    /** How the category was arrived at, so a surprising one can explain itself. */
+    private CategorySource categorySource = CategorySource.MANUAL;
 }

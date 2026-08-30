@@ -14,6 +14,11 @@ import java.util.List;
  *                  are part of {@code imported}, not separate from it: they are
  *                  real rows and they count toward totals until the owner
  *                  reviews them.
+ * @param needsReview rows written whose category was guessed rather than
+ *                  known, and which are waiting to be approved or refiled.
+ *                  Also part of {@code imported}: the guess is applied, so the
+ *                  dashboard is roughly right immediately and gets more right
+ *                  as the queue is worked through.
  * @param errors    the first few reasons a row was skipped
  * @param columnMapping how the file's columns were understood, in plain words.
  *                  Always reported: a mapping that guessed wrong is worse than
@@ -21,6 +26,6 @@ import java.util.List;
  *                  that "Reference" was the wrong column to read as the
  *                  description.
  */
-public record ImportResultDTO(int imported, int skipped, int flagged, List<String> errors,
-        String columnMapping) {
+public record ImportResultDTO(int imported, int skipped, int flagged, int needsReview,
+        List<String> errors, String columnMapping) {
 }

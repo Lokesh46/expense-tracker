@@ -19,6 +19,13 @@ import com.lokesh_codes.expense_tracker_backend.service.crypto.BlindIndex;
 @Component
 public class TransactionIndexer {
 
+    /**
+     * Stored when a description has no merchant in it — marking the row as
+     * examined, so it is not mistaken for one the backfill has yet to reach.
+     * Never matches a real digest, which is always base64.
+     */
+    static final String NO_MERCHANT = " ";
+
     private final BlindIndex blindIndex;
     private final TransactionFingerprint fingerprint;
 
@@ -38,5 +45,36 @@ public class TransactionIndexer {
         transaction.setSearchTokens(
                 blindIndex.tokensFor(transaction.getDescription(), transaction.getComments()));
         transaction.setFingerprint(fingerprint.of(transaction));
+        indexMerchant(transaction);
+    }
+
+    /**
+     * Works out which merchant the row is about, and stores it two ways: the
+     * name to show, encrypted, and a digest to group by, which SQL can reach.
+     *
+     * <p>A description with no merchant in it stores the {@code NO_MERCHANT}
+     * sentinel rather than null. Null is what the backfill looks for, so a
+     * reference-only row left null would be re-examined on every boot for the
+     * rest of its life.
+     */
+    private void indexMerchant(Transaction transaction) {
+        String merchant = MerchantKey.of(transaction.getDescription());
+
+        transaction.setMerchantName(merchant);
+        transaction.setMerchantHash(
+                merchant == null ? NO_MERCHANT : blindIndex.keyedDigest(merchant));
+    }
+
+    /**
+     * The digest to look a description's merchant up by, or null when it has no
+     * merchant to look up.
+     *
+     * <p>For an import, which needs every merchant in a file before it starts
+     * building rows so that history can be fetched in one query rather than one
+     * per row. Null rather than the sentinel: there is nothing to ask about.
+     */
+    public String merchantHashFor(String description) {
+        String merchant = MerchantKey.of(description);
+        return merchant == null ? null : blindIndex.keyedDigest(merchant);
     }
 }

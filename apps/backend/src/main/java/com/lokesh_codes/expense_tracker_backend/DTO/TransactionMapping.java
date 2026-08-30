@@ -20,6 +20,8 @@ public final class TransactionMapping {
                 transaction.getDate(),
                 transaction.getPaymentMethod(),
                 transaction.getComments(),
-                transaction.isPossibleDuplicate());
+                transaction.isPossibleDuplicate(),
+                transaction.isCategoryConfirmed(),
+                transaction.getCategorySource());
     }
 }

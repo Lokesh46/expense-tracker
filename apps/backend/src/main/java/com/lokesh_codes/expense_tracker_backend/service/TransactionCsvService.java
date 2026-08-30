@@ -30,6 +30,7 @@ import com.lokesh_codes.expense_tracker_backend.DTO.TransactionFilter;
 import com.lokesh_codes.expense_tracker_backend.entity.ActivityAction;
 import com.lokesh_codes.expense_tracker_backend.entity.Category;
 import com.lokesh_codes.expense_tracker_backend.entity.CategoryRule;
+import com.lokesh_codes.expense_tracker_backend.entity.CategorySource;
 import com.lokesh_codes.expense_tracker_backend.entity.Transaction;
 import com.lokesh_codes.expense_tracker_backend.entity.TransactionType;
 import com.lokesh_codes.expense_tracker_backend.entity.User;
@@ -61,6 +62,25 @@ public class TransactionCsvService {
 
     /** Where a row goes when no rule fires and the file names nothing we know. */
     private static final String UNCATEGORISED = "Uncategorised";
+
+    /**
+     * How many times a merchant must have been filed the same way before an
+     * import files it that way without asking.
+     *
+     * <p>Three is the point where a pattern stops being a coincidence. Two would
+     * let a pair of early mistakes set the rule for a merchant permanently; five
+     * would mean months of reviewing something obvious.
+     */
+    private static final int MIN_HISTORY = 3;
+
+    /**
+     * How much of a merchant's history has to agree before it counts as settled.
+     *
+     * <p>Not all of it. A merchant filed nine times under Food and once under
+     * Groceries plainly means Food, and requiring unanimity would throw that away
+     * over one slip and never recover.
+     */
+    private static final double HISTORY_AGREEMENT = 0.8;
 
     /**
      * How far into the file to look for evidence that it is not text at all.
@@ -202,7 +222,7 @@ public class TransactionCsvService {
         if (PdfStatementReader.looksLikePdf(uploaded)) {
             content = fromPdf(uploaded, pdfPassword, errors);
             if (content.length == 0) {
-                return new ImportResultDTO(0, 0, 0, errors,
+                return new ImportResultDTO(0, 0, 0, 0, errors,
                         "No transaction table could be read from that PDF.");
             }
         } else {
@@ -212,7 +232,7 @@ public class TransactionCsvService {
 
         List<RawRow> rows = readRows(content, errors);
         if (rows.isEmpty()) {
-            return new ImportResultDTO(0, 0, 0, errors, "Nothing to read in that file.");
+            return new ImportResultDTO(0, 0, 0, 0, errors, "Nothing to read in that file.");
         }
 
         CsvColumns columns = describeColumns(rows);
@@ -220,7 +240,7 @@ public class TransactionCsvService {
             errors.add("Could not find a date, a description and an amount. " + columns.summary()
                     + " Rename those columns, or re-save the file as "
                     + "Date,Description,Category,Amount.");
-            return new ImportResultDTO(0, 0, 0, errors, columns.summary());
+            return new ImportResultDTO(0, 0, 0, 0, errors, columns.summary());
         }
 
         warnIfDatesContradictTheChosenOrder(rows, columns, order, errors);
@@ -248,12 +268,14 @@ public class TransactionCsvService {
         }
 
         int flagged = flagDuplicates(user, toSave);
+        int needsReview = (int) toSave.stream().filter(t -> !t.isCategoryConfirmed()).count();
         saveInBatches(toSave);
 
         activity.record(ActivityAction.TRANSACTIONS_IMPORTED, user.getUsername(),
                 toSave.size() + " imported, " + skipped + " skipped, " + flagged + " flagged");
 
-        return new ImportResultDTO(toSave.size(), skipped, flagged, errors, columns.summary());
+        return new ImportResultDTO(toSave.size(), skipped, flagged, needsReview, errors,
+                columns.summary());
     }
 
     // -------------------------------------------------------------- reading
@@ -370,17 +392,71 @@ public class TransactionCsvService {
         // category per row would turn a ten-thousand-row file into twenty
         // thousand queries.
         Map<String, Category> categoriesByName = new HashMap<>();
-        categoryRepository.findByUser_IdOrderByNameAsc(user.getId())
-                .forEach(category -> categoriesByName.put(lower(category.getName()), category));
+        Map<Integer, Category> categoriesById = new HashMap<>();
+        categoryRepository.findByUser_IdOrderByNameAsc(user.getId()).forEach(category -> {
+            categoriesByName.put(lower(category.getName()), category);
+            categoriesById.put(category.getId(), category);
+        });
 
         return new ImportContext(
                 categoriesByName,
+                categoriesById,
                 ruleService.activeRulesFor(user.getId()),
+                loadHistory(user, columns, rows),
                 new LinkedHashSet<>(),
                 columns,
                 order,
                 signCarriesMeaning(rows, columns),
                 fallbackCurrency);
+    }
+
+    /**
+     * Where this account has filed each merchant in the file before.
+     *
+     * <p>One query for the whole import, and only for the merchants the file
+     * actually mentions — asking per row would turn a ten-thousand-row statement
+     * into ten thousand queries, and asking about the whole ledger would load a
+     * history that is mostly irrelevant to this file.
+     */
+    private Map<String, Suggestion> loadHistory(User user, CsvColumns columns, List<RawRow> rows) {
+        int descriptionIndex = columns.indexOf(Field.DESCRIPTION);
+
+        Set<String> hashes = new HashSet<>();
+        for (RawRow row : rows) {
+            String hash = indexer.merchantHashFor(
+                    CsvSupport.stripFormulaGuard(fieldAt(row.fields(), descriptionIndex)));
+            if (hash != null) {
+                hashes.add(hash);
+            }
+        }
+        if (hashes.isEmpty()) {
+            return Map.of();
+        }
+
+        // [merchantHash, categoryId, count], one row per category a merchant has
+        // ever been filed under.
+        Map<String, Map<Integer, Long>> counts = new HashMap<>();
+        for (Object[] row : transactionRepository
+                .findConfirmedMerchantCategories(user.getId(), hashes)) {
+            counts.computeIfAbsent((String) row[0], key -> new HashMap<>())
+                    .put((Integer) row[1], ((Number) row[2]).longValue());
+        }
+
+        Map<String, Suggestion> history = new HashMap<>();
+        counts.forEach((hash, byCategory) -> {
+            long total = byCategory.values().stream().mapToLong(Long::longValue).sum();
+            Map.Entry<Integer, Long> top = byCategory.entrySet().stream()
+                    .max(Map.Entry.comparingByValue())
+                    .orElseThrow();
+
+            // Consistent rather than unanimous. Filing Swiggy under Food nine
+            // times and under Groceries once says Food, and demanding a clean
+            // sweep would throw that away over a single slip.
+            boolean strong = top.getValue() >= MIN_HISTORY
+                    && top.getValue() >= total * HISTORY_AGREEMENT;
+            history.put(hash, new Suggestion(top.getKey(), strong));
+        });
+        return history;
     }
 
     private Transaction parseRow(List<String> fields, User user, ImportContext context) {
@@ -405,11 +481,9 @@ public class TransactionCsvService {
         requireAtMost(categoryName, MAX_CATEGORY_NAME, "category name");
 
         Money money = readMoney(fields, context);
-        Category category = resolveCategory(description, categoryName, user, context);
 
         Transaction transaction = new Transaction();
         transaction.setUser(user);
-        transaction.setCategory(category);
         transaction.setDate(date);
         transaction.setDescription(description);
         transaction.setAmount(money.amount());
@@ -424,7 +498,17 @@ public class TransactionCsvService {
         requireAtMost(comments, MAX_COMMENTS, "comments");
         transaction.setComments(comments);
 
+        // Before the category, not after: indexing is what works out which
+        // merchant the row is about, and the merchant is what history is keyed
+        // on. Nothing indexed depends on the category, so the order is free.
         indexer.index(transaction);
+
+        Filing filing = resolveCategory(description, categoryName,
+                transaction.getMerchantHash(), user, context);
+        transaction.setCategory(filing.category());
+        transaction.setCategorySource(filing.source());
+        transaction.setCategoryConfirmed(filing.confirmed());
+
         return transaction;
     }
 
@@ -587,7 +671,11 @@ public class TransactionCsvService {
      * Everything an import needs to read a row, gathered once.
      *
      * @param categoriesByName       the user's categories, keyed by lowercased name
+     * @param categoriesById         the same categories, for looking up what
+     *                               history suggests
      * @param rules                  active filing rules, in the order to try them
+     * @param history                what this account has filed each merchant in
+     *                               the file under before
      * @param unrecognisedCategories names in the file that matched no category,
      *                               collected so the user can be told
      * @param columns                which column holds what
@@ -596,12 +684,38 @@ public class TransactionCsvService {
      * @param fallbackCurrency       what to use when the file names none
      */
     private record ImportContext(Map<String, Category> categoriesByName,
+            Map<Integer, Category> categoriesById,
             List<CategoryRule> rules,
+            Map<String, Suggestion> history,
             Set<String> unrecognisedCategories,
             CsvColumns columns,
             DateOrder dateOrder,
             boolean signCarriesMeaning,
             String fallbackCurrency) {
+    }
+
+    /**
+     * Where a merchant has been filed before, and whether that is settled enough
+     * to act on without asking.
+     *
+     * @param categoryId the category it has most often been filed under
+     * @param strong     true when the pattern is consistent enough to apply
+     *                   without review — see {@link #MIN_HISTORY} and
+     *                   {@link #HISTORY_AGREEMENT}
+     */
+    private record Suggestion(Integer categoryId, boolean strong) {
+    }
+
+    /**
+     * What a row is filed as, and how much that is worth.
+     *
+     * @param category  where it goes
+     * @param source    how that was decided, so the interface can say why
+     * @param confirmed whether the owner has actually agreed. False puts the row
+     *                  in the review queue and keeps it out of what the next
+     *                  import learns from.
+     */
+    private record Filing(Category category, CategorySource source, boolean confirmed) {
     }
 
     private String unrecognisedMessage(Set<String> names) {
@@ -714,34 +828,59 @@ public class TransactionCsvService {
     /**
      * Decides which category a row is filed under.
      *
-     * <p>In order: a filing rule the user wrote, then the file's own Category
-     * column but only if that category already exists, then "Uncategorised".
+     * <p>In order: a filing rule the user wrote; then where this merchant has
+     * consistently been filed before; then the file's own Category column, but
+     * only if that category already exists; then a thinner history; then
+     * "Uncategorised".
      *
-     * <p>The middle step used to create whatever the column said. That turned one
+     * <p>The order is the argument. A rule is an instruction and outranks
+     * everything. Settled history is next, because a merchant filed the same way
+     * half a dozen times is not a guess. A name written in the file beats a
+     * one-off precedent, being explicit about this row rather than inferred from
+     * another. Only the first three are certain enough to apply without asking;
+     * the rest are applied and left in the review queue.
+     *
+     * <p>The Category column used to create whatever it said. That turned one
      * typo in a bank export into a permanent category, and there was no way to
      * tell a real new category from a misspelling of an old one. Names that are
-     * not recognised are now reported back instead, so the user can create the
+     * not recognised are reported back instead, so the user can create the
      * category, or write a rule, and import again.
      */
-    private Category resolveCategory(String description, String categoryName, User user,
-            ImportContext context) {
+    private Filing resolveCategory(String description, String categoryName, String merchantHash,
+            User user, ImportContext context) {
 
         for (CategoryRule rule : context.rules()) {
             if (rule.getMatchType().matches(description, rule.getPattern())) {
-                return rule.getCategory();
+                return new Filing(rule.getCategory(), CategorySource.RULE, true);
             }
+        }
+
+        Suggestion suggested = merchantHash == null ? null : context.history().get(merchantHash);
+        // Null when the category has since been deleted, in which case the
+        // history is real but no longer points anywhere.
+        Category remembered = suggested == null
+                ? null
+                : context.categoriesById().get(suggested.categoryId());
+
+        if (remembered != null && suggested.strong()) {
+            return new Filing(remembered, CategorySource.HISTORY, true);
         }
 
         if (!categoryName.isBlank()) {
             Category named = context.categoriesByName().get(lower(categoryName));
             if (named != null) {
-                return named;
+                return new Filing(named, CategorySource.FILE, true);
             }
             context.unrecognisedCategories().add(categoryName);
         }
 
-        return context.categoriesByName().computeIfAbsent(lower(UNCATEGORISED),
+        if (remembered != null) {
+            return new Filing(remembered, CategorySource.HISTORY, false);
+        }
+
+        Category uncategorised = context.categoriesByName().computeIfAbsent(lower(UNCATEGORISED),
                 key -> categoryRepository.save(new Category(user, UNCATEGORISED, DEFAULT_COLOR)));
+        return new Filing(uncategorised, CategorySource.NONE, false);
     }
 
     private void requireAtMost(String value, int max, String field) {

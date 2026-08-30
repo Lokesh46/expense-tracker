@@ -1,6 +1,7 @@
 package com.lokesh_codes.expense_tracker_backend.service.crypto;
 
 import java.util.List;
+import java.util.function.Function;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,7 +77,14 @@ public class EncryptionBackfill implements ApplicationRunner {
      * by hand from a console — without having to enable it at startup.
      */
     public int backfill() {
-        return backfillTransactions() + backfillRecurring();
+        // Two passes over the same table, because the two columns arrived with
+        // different releases: a row encrypted last time round has a search index
+        // already and still has no merchant. Rewriting fills whatever is
+        // missing, so the passes overlap harmlessly and the second one only
+        // sees what the first did not reach.
+        return rewrite(transactions::findBySearchTokensIsNull)
+                + rewrite(transactions::findByMerchantHashIsNull)
+                + backfillRecurring();
     }
 
     /**
@@ -88,22 +96,27 @@ public class EncryptionBackfill implements ApplicationRunner {
      * <p>No transaction spanning the whole job. Each batch commits on its own, so
      * a backfill interrupted halfway keeps what it has done rather than starting
      * again, and a large table never becomes one enormous write.
+     *
+     * <p>This terminates only because {@code index} always leaves a value behind
+     * — a row with no merchant in its description stores a sentinel rather than
+     * null. A pass whose query still matched the rows it had just written would
+     * loop until the instance died.
      */
-    private int backfillTransactions() {
+    private int rewrite(Function<Pageable, List<Transaction>> pending) {
         int total = 0;
         Pageable batch = PageRequest.of(0, BATCH);
 
         while (true) {
-            List<Transaction> pending = transactions.findBySearchTokensIsNull(batch);
-            if (pending.isEmpty()) {
+            List<Transaction> rows = pending.apply(batch);
+            if (rows.isEmpty()) {
                 return total;
             }
 
-            pending.forEach(indexer::index);
-            transactions.saveAll(pending);
-            total += pending.size();
+            rows.forEach(indexer::index);
+            transactions.saveAll(rows);
+            total += rows.size();
 
-            if (pending.size() < BATCH) {
+            if (rows.size() < BATCH) {
                 return total;
             }
         }

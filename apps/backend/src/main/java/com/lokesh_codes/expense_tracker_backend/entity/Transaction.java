@@ -30,7 +30,11 @@ import lombok.NoArgsConstructor;
         @Index(name = "idx_transactions_user_date", columnList = "user_id, date"),
         // An import looks up every row it is about to add against this pair, so
         // without the index a duplicate check is a table scan per file.
-        @Index(name = "idx_transactions_user_fingerprint", columnList = "user_id, fingerprint")
+        @Index(name = "idx_transactions_user_fingerprint", columnList = "user_id, fingerprint"),
+        // Both the review screen and every import group on this pair: what an
+        // account has filed this merchant under before, and which rows of it are
+        // still waiting to be looked at.
+        @Index(name = "idx_transactions_user_merchant", columnList = "user_id, merchant_hash")
 })
 public class Transaction {
 
@@ -124,4 +128,50 @@ public class Transaction {
      */
     @Column(name = "possible_duplicate", nullable = false, columnDefinition = "boolean default false")
     private boolean possibleDuplicate = false;
+
+    /**
+     * A keyed digest of the merchant in the description. See {@code MerchantKey}
+     * for what is stripped to arrive at it.
+     *
+     * <p>Digested rather than stored plainly so that grouping — "everything from
+     * this shop" — happens in SQL without decrypting a column. A merchant name
+     * in the clear would give away most of what encrypting the description is
+     * for.
+     *
+     * <p>A single space means "looked at, and there was no merchant in it". Null
+     * means not looked at yet, which is what the backfill searches for; without
+     * the distinction a reference-only row is picked up on every boot forever.
+     */
+    @Column(name = "merchant_hash", length = 24)
+    private String merchantHash;
+
+    /**
+     * The merchant as it should be shown, e.g. {@code swiggy}. Encrypted for the
+     * same reason as the description it was taken from.
+     */
+    @Convert(converter = EncryptedStringConverter.class)
+    @Column(name = "merchant_name", length = 512)
+    private String merchantName;
+
+    /** How this row came to be filed where it is. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "category_source", nullable = false, length = 12,
+            columnDefinition = "varchar(12) default 'MANUAL'")
+    private CategorySource categorySource = CategorySource.MANUAL;
+
+    /**
+     * Whether the owner has actually agreed with the category.
+     *
+     * <p>Defaults true, at the database level as well as here, and that is not a
+     * detail: every row written before this column existed is a decision its
+     * owner has already lived with. Defaulting false would empty an entire
+     * ledger into the review queue the moment this deploys.
+     *
+     * <p>Only an import writes false, and only where it guessed. What that guards
+     * is the history lookup, which counts confirmed rows alone — otherwise one
+     * wrong guess is counted as evidence for itself and hardens into a fact.
+     */
+    @Column(name = "category_confirmed", nullable = false,
+            columnDefinition = "boolean default true")
+    private boolean categoryConfirmed = true;
 }
