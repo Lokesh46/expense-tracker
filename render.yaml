@@ -75,10 +75,8 @@ services:
       # do, which on a free instance is added to a cold start that is already
       # slow.
       #
-      # CURRENTLY ON: for the merchant backfill. Turn it off after the next
-      # successful deploy.
       - key: CRYPTO_BACKFILL_ON_START
-        value: "true"
+        value: "false"
 
       # The username to promote to administrator.
       #
