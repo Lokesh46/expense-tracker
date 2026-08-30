@@ -174,6 +174,39 @@ class BankStatementImportApiTest extends ApiTestBase {
     }
 
     @Test
+    @DisplayName("HDFC writes 0.00 in the unused column rather than leaving it empty")
+    void zeroRatherThanEmptyInTheUnusedColumn() throws Exception {
+        String token = signUp("hdfczero");
+
+        // A real HDFC statement never leaves withdrawal or deposit blank: the
+        // one that did not happen is written as 0.00. A zero has to count as
+        // "not this direction", or every row would be read as money out.
+        //
+        // Also its own digit grouping: 1,99,999.99 groups by lakhs rather than
+        // thousands, and the separators have to come out without the number
+        // changing. Quoted here because a bare comma is a CSV delimiter -- the
+        // PDF path quotes it for the same reason, in CsvSupport.escape.
+        importFile(token, """
+                Date,Narration,Withdrawal Amt.,Deposit Amt.,Closing Balance
+                14/08/2026,UPI-SWIGGY-1234,450.00,0.00,25000.00
+                15/08/2026,SALARY CREDIT,0.00,"1,99,999.99",224999.99
+                """)
+                .andExpect(jsonPath("$.imported").value(2))
+                .andExpect(jsonPath("$.skipped").value(0));
+
+        mockMvc.perform(get("/api/transactions?type=INCOME")
+                .header("Authorization", bearer(token)))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].description").value("SALARY CREDIT"))
+                .andExpect(jsonPath("$.content[0].amount").value(199999.99));
+
+        mockMvc.perform(get("/api/transactions?type=EXPENSE")
+                .header("Authorization", bearer(token)))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].amount").value(450.00));
+    }
+
+    @Test
     @DisplayName("Starling: the currency is named in the amount column's header")
     void starlingCurrencyFromHeader() throws Exception {
         String token = signUp("starling");

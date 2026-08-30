@@ -6,7 +6,6 @@ import java.util.List;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.encryption.InvalidPasswordException;
-import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
@@ -77,17 +76,18 @@ public class PdfStatementReader {
                                 + " pages. Export a single statement rather than a whole archive.");
             }
 
-            PDFTextStripper stripper = new PDFTextStripper();
-            // Sorting by position is what recovers a table from a PDF: without
-            // it the text comes back in the order it happens to be drawn, which
-            // for a table is close to arbitrary.
-            stripper.setSortByPosition(true);
+            // Not a plain PDFTextStripper. That returns a line's characters
+            // separated by single spaces, which for a statement means the
+            // columns are gone before anything can read them — the gaps are the
+            // table. See PdfLayoutStripper.
+            PdfLayoutStripper stripper = new PdfLayoutStripper();
             stripper.setLineSeparator("\n");
+            stripper.getText(document);
 
-            String text = stripper.getText(document);
-            rejectIfScanned(text, document.getNumberOfPages());
+            List<String> lines = stripper.lines();
+            rejectIfScanned(String.join("\n", lines), document.getNumberOfPages());
 
-            return List.of(text.split("\n", -1));
+            return lines;
 
         } catch (ResponseStatusException e) {
             throw e;
