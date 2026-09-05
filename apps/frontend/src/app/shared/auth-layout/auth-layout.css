@@ -194,6 +194,72 @@
 }
 
 /* --------------------------------------------------------------------------
+   Cold-start notice
+
+   The API sleeps on the free plan and takes a few minutes to come back. The
+   banner is deliberately quiet -- an accent note, not an error -- because a
+   slow server is not the user's mistake and nothing has actually gone wrong.
+   -------------------------------------------------------------------------- */
+
+.wake-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+  padding: var(--space-3) var(--space-4);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  background: var(--accent-muted);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.wake-note.is-bad {
+  border-left-color: var(--negative);
+  background: var(--negative-muted);
+}
+
+.wake-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  /* Optically centred on the first line of text, not on the box. */
+  margin-top: 0.5em;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  animation: wake-pulse 1.6s ease-in-out infinite;
+}
+
+.wake-note.is-bad .wake-dot {
+  background: var(--negative);
+  animation: none;
+}
+
+/* Tabular figures stop the count jittering the line as it ticks over. */
+.wake-elapsed {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@keyframes wake-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wake-dot {
+    animation: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
    Narrow screens: the editorial panel collapses to a masthead.
    -------------------------------------------------------------------------- */
 

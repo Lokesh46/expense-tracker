@@ -1,0 +1,65 @@
+# Reports whether the deployed API is answering. It does not keep it warm.
+#
+# It used to try. The cron said every ten minutes; GitHub delivered between two
+# and five runs a day, because scheduled workflows are queued at low priority
+# and high-frequency schedules are dropped wholesale. Runs also arrived up to an
+# hour late, outside the window the cron asked for. Render stops a free instance
+# after ~15 minutes idle, so pings three to four hours apart kept it warm about
+# six per cent of the time.
+#
+# The keep-warm ping now runs on an external scheduler that actually fires on
+# time -- see "Keeping the API warm" in README.md. What is left here is a
+# canary: an independent check, on someone else's infrastructure, that the thing
+# is up.
+#
+# It runs inside the external schedule's waking window on purpose. A canary at
+# 03:00 would wake a sleeping instance by itself, burning the free plan's 750
+# monthly hours to test something nobody was using.
+name: API canary
+
+on:
+  schedule:
+    # Hourly, 02:00-18:59 UTC = 07:30-00:29 IST. Inside the keep-warm window,
+    # so this never wakes the instance on its own.
+    - cron: '0 2-18 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: api-canary
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check the API answers
+        run: |
+          URL="https://expense-tracker-api-8d97.onrender.com/actuator/health"
+
+          # A cold start measured at ~176s, so one attempt proves nothing. Four
+          # attempts at two minutes covers roughly eight, which is past any
+          # honest boot and well into "something is actually wrong".
+          for attempt in 1 2 3 4; do
+            code=$(curl --silent --show-error --location \
+                        --max-time 120 --output /tmp/body.json \
+                        --write-out '%{http_code}' "$URL" || echo "000")
+
+            if [ "$code" = "200" ]; then
+              echo "up (attempt $attempt): $(cat /tmp/body.json)"
+              exit 0
+            fi
+
+            echo "attempt $attempt returned $code"
+            sleep 10
+          done
+
+          # This used to warn and exit 0, which meant every run was green --
+          # including the ones where all three attempts timed out. A check that
+          # cannot go red is not a check.
+          echo "::error::API did not answer after 4 attempts over ~8 minutes."
+          exit 1

@@ -57,6 +57,28 @@
         <p class="auth-blurb">{{ blurb() }}</p>
       </header>
 
+      <!-- Only ever visible on a cold instance: the service stays quiet for the
+           first couple of seconds so a warm visit shows nothing at all. -->
+      @if (wakeStatus() === 'waking') {
+        <p class="wake-note" role="status">
+          <span class="wake-dot" aria-hidden="true"></span>
+          <span>
+            Waking the server. The free plan stops it when nobody is using it, and
+            starting it again takes a few minutes. Fill this in as usual — your sign-in
+            will go through the moment it is up.
+            <span class="wake-elapsed">{{ waitedSeconds() }}s</span>
+          </span>
+        </p>
+      } @else if (wakeStatus() === 'unreachable') {
+        <p class="wake-note is-bad" role="status">
+          <span class="wake-dot" aria-hidden="true"></span>
+          <span>
+            The server is not answering. It may be mid-deploy — waiting a minute and
+            reloading usually settles it.
+          </span>
+        </p>
+      }
+
       <ng-content />
     </div>
   </main>

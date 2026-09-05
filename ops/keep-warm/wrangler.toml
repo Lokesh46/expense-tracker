@@ -1,0 +1,11 @@
+name = "expense-tracker-keep-warm"
+main = "worker.js"
+compatibility_date = "2025-01-01"
+
+[triggers]
+# Every 10 minutes, 01:00-18:59 UTC = 06:30-00:29 IST.
+#
+# Waking hours only, on purpose: free Render instances get 750 hours a month and
+# a month is about 730, so pinging around the clock leaves almost no headroom
+# and nothing at all for a second free service. This costs roughly 540.
+crons = ["*/10 1-18 * * *"]

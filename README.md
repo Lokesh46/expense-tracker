@@ -457,8 +457,8 @@ sign out every user. Run the app locally once, then copy the whole contents of
 `apps/backend/data/jwt-signing-key.json` into the variable.
 
 The free plan sleeps after roughly 15 minutes of inactivity, so the first
-request after a quiet spell takes about 50 seconds. Everything after that is
-normal speed.
+request after a quiet spell takes about three minutes. Everything after that is
+normal speed. See "Keeping it warm" below.
 
 ### 3. Frontend
 
@@ -474,27 +474,79 @@ refused by CORS with a bare 403 and no explanation.
 
 ### Keeping it warm
 
-The free plan spins the instance down after about 15 minutes of inactivity, and
-waking it takes roughly 50 seconds -- long enough that the app looks broken
-rather than slow.
+The free plan stops the instance after about 15 minutes of inactivity. Waking it
+takes **roughly three minutes** -- measured end to end, not estimated. The cost
+is the container, Spring Boot's startup and Neon resuming its own compute, all
+on a throttled CPU. Long enough that the app looks broken rather than slow.
 
-`.github/workflows/keep-alive.yml` pings `/actuator/health` every 10 minutes
-between 06:30 and 00:30 IST. Waking hours only, on purpose: free instances get
-750 hours a month and a month is about 730, so pinging around the clock would
-consume the whole allowance. Waking hours costs roughly 540 and leaves headroom.
-The same request keeps the Neon database warm, since its compute also suspends
-when idle.
+Two things address it, and only the first actually prevents the wait. A third
+watches that the first is still running.
 
-Two honest limitations:
+#### The scheduled ping
 
-- GitHub queues scheduled workflows at low priority and can delay them by 15
-  minutes or more, so an occasional cold start still gets through.
-- GitHub disables scheduled workflows in repositories with no activity for 60
-  days. If the app suddenly feels slow again, check the Actions tab first.
+Something outside Render requests `/actuator/health` every 10 minutes between
+01:00 and 19:00 UTC (06:30-00:30 IST). Waking hours only, on purpose: free
+instances get 750 hours a month and a month is about 730, so pinging around the
+clock leaves almost no headroom and nothing at all for a second free service.
+Waking hours costs roughly 540. The same request keeps Neon warm, since its
+compute also suspends when idle.
+
+`ops/keep-warm/` holds a Cloudflare Worker that does this. Cloudflare's cron
+triggers are free, fire on time, and take an hour range, which is what keeps the
+schedule inside the budget above.
+
+To deploy it with the CLI:
+
+```bash
+npx wrangler deploy --config ops/keep-warm/wrangler.toml
+```
+
+Or paste `worker.js` into a new Worker in the Cloudflare dashboard and add the
+cron trigger from `wrangler.toml` under **Settings -> Triggers**. Visiting the
+worker's own URL runs the same check by hand and reports how long the API took,
+which is the quickest way to confirm it is doing anything.
+
+Alternatives, if Cloudflare is not an option:
+
+- **cron-job.org** — free and well suited to this, but its signup runs an
+  automated anti-abuse screen that rejects some legitimate registrations
+  (disposable or forwarding email domains, VPN addresses at signup time).
+- **UptimeRobot** — free at a 5-minute floor, but it checks around the clock and
+  cannot restrict itself to a window. That pins the instance at roughly 730
+  hours a month. It fits inside 750, but only just, and only while this is the
+  only free service on the account.
+
+**None of this belongs in GitHub Actions.** It was there, and it did not work.
+The cron asked for every 10 minutes; GitHub delivered between two and five runs
+a day, sometimes an hour outside the requested window, because scheduled
+workflows are queued at low priority and high-frequency schedules are dropped.
+At three to four hours between pings and a 15-minute idle timeout, the instance
+was warm about six per cent of the time.
+
+#### The warm-up ping from the browser
+
+`WakeService` asks for `/actuator/health` as soon as the sign-in or register
+screen renders, so a cold start overlaps with the form being filled in instead
+of following it. If the API has not answered within two seconds the screen says
+so and counts the wait, rather than showing a dead button.
+
+This narrows the window; it does not close it. It is the fallback for the gaps
+the scheduler cannot cover -- a redeploy, or a first visit outside waking hours.
+
+#### The canary
+
+`.github/workflows/api-canary.yml` checks hourly, inside the same waking window,
+that the API answers -- and fails loudly when it does not. It keeps nothing warm.
+It exists so that a scheduler which has quietly stopped shows up as a red run
+instead of as a slow app.
+
+Note that GitHub disables scheduled workflows in repositories with no activity
+for 60 days, so the canary can go quiet on its own. The external scheduler's own
+failure notifications are the thing to rely on.
 
 If cold starts stop being acceptable, the options are a host that does not sleep
 (Fly.io wakes in a few seconds; an Oracle Cloud always-free VM does not sleep at
-all) or Render's paid plan.
+all) or Render's paid plan, which is $7 a month and removes the problem entirely.
 
 ### Checking it worked
 
