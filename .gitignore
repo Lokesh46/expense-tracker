@@ -23,6 +23,9 @@ apps/backend/data/
 .DS_Store
 Thumbs.db
 
+# --- claude code ---
+.claude/settings.local.json
+
 # --- logs ---
 *.log
 npm-debug.log*
