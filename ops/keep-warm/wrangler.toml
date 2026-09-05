@@ -1,4 +1,8 @@
-name = "expense-tracker-keep-warm"
+# Cloudflare generated this name when the Worker was created from the dashboard
+# template. It is kept verbatim rather than tidied: `wrangler deploy` matches the
+# deployed Worker by name, so renaming it here would publish a second Worker
+# beside the live one and both would ping.
+name = "old-cherry-7f98"
 main = "worker.js"
 compatibility_date = "2025-01-01"
 
