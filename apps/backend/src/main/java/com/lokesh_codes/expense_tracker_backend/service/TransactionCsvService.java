@@ -7,10 +7,13 @@ import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.HexFormat;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -200,16 +203,78 @@ public class TransactionCsvService {
      * length of this call and discarded — see the multipart threshold in
      * {@code application.properties}, which is what keeps the servlet container
      * from spilling it to a temp file before this method is reached.
+     *
+     * <p>This method is only the allowance: charge, read, then confirm or hand
+     * the charge back. {@link #read} is the reading. The two are separate
+     * because what the allowance is spent on is a decision about the endpoint,
+     * not a detail of parsing, and burying it in the parse is how it came to be
+     * charged for files that were never read at all.
      */
     @Transactional
     public ImportResultDTO importCsv(MultipartFile file, DateOrder dateOrder,
             String defaultCurrency, String pdfPassword) throws IOException {
         User user = currentUser.require();
-        rateLimiter.require("import:" + user.getId(), maxImportsPerHour,
-                "You have imported several files in the last hour. Try again shortly.");
 
+        // Read before the allowance is checked, because the bytes are what
+        // identify the attempt. Already in memory by this point and bounded by
+        // the multipart limit -- see the threshold in application.properties.
         byte[] uploaded = file.getBytes();
 
+        Charge charge = new Charge("import:" + user.getId(), fingerprint(uploaded));
+        rateLimiter.require(charge.key(), charge.fingerprint(), maxImportsPerHour,
+                "You have imported several files in the last hour. Try again shortly.");
+
+        try {
+            ImportResultDTO result = read(uploaded, user, dateOrder, defaultCurrency, pdfPassword,
+                    charge);
+            rateLimiter.settle(charge.key(), charge.fingerprint());
+            return result;
+        } catch (RuntimeException | IOException e) {
+            // The transaction is rolling back and nothing was imported. The
+            // allowance is in memory and rolls back with nothing, so it has to
+            // be handed back here or a file that could not be read costs the
+            // same as one that worked.
+            rateLimiter.refund(charge.key(), charge.fingerprint());
+            throw e;
+        }
+    }
+
+    /** The allowance one import was charged against, so it can be given back. */
+    private record Charge(String key, String fingerprint) {
+    }
+
+    /**
+     * Hands the allowance back and returns {@code result} unchanged.
+     *
+     * <p>For every path that ends with nothing imported: a PDF with no table in
+     * it, a file with no rows, a header that named no amount, a file read in
+     * full whose every row was rejected. The user is told what is wrong with
+     * the file and is no closer to being locked out for it.
+     */
+    private ImportResultDTO abandon(Charge charge, ImportResultDTO result) {
+        rateLimiter.refund(charge.key(), charge.fingerprint());
+        return result;
+    }
+
+    /**
+     * Identifies an upload by its content, so the several requests one upload
+     * can take are recognised as one attempt.
+     *
+     * <p>A digest rather than the bytes: it lives in the rate limiter for the
+     * length of the window, and a window of recent uploads held in memory
+     * should not be a window of recent statements. Nothing here is stored or
+     * logged either way.
+     */
+    private static String fingerprint(byte[] content) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(content));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is required of every JVM", e);
+        }
+    }
+
+    private ImportResultDTO read(byte[] uploaded, User user, DateOrder dateOrder,
+            String defaultCurrency, String pdfPassword, Charge charge) throws IOException {
         DateOrder order = dateOrder == null ? DateOrder.DAY_FIRST : dateOrder;
         String fallbackCurrency = normaliseCurrency(defaultCurrency);
         List<String> errors = new ArrayList<>();
@@ -222,8 +287,8 @@ public class TransactionCsvService {
         if (PdfStatementReader.looksLikePdf(uploaded)) {
             content = fromPdf(uploaded, pdfPassword, errors);
             if (content.length == 0) {
-                return new ImportResultDTO(0, 0, 0, 0, errors,
-                        "No transaction table could be read from that PDF.");
+                return abandon(charge, new ImportResultDTO(0, 0, 0, 0, errors,
+                        "No transaction table could be read from that PDF."));
             }
         } else {
             rejectIfNotText(uploaded);
@@ -232,7 +297,8 @@ public class TransactionCsvService {
 
         List<RawRow> rows = readRows(content, errors);
         if (rows.isEmpty()) {
-            return new ImportResultDTO(0, 0, 0, 0, errors, "Nothing to read in that file.");
+            return abandon(charge,
+                    new ImportResultDTO(0, 0, 0, 0, errors, "Nothing to read in that file."));
         }
 
         CsvColumns columns = describeColumns(rows);
@@ -240,7 +306,7 @@ public class TransactionCsvService {
             errors.add("Could not find a date, a description and an amount. " + columns.summary()
                     + " Rename those columns, or re-save the file as "
                     + "Date,Description,Category,Amount.");
-            return new ImportResultDTO(0, 0, 0, 0, errors, columns.summary());
+            return abandon(charge, new ImportResultDTO(0, 0, 0, 0, errors, columns.summary()));
         }
 
         warnIfDatesContradictTheChosenOrder(rows, columns, order, errors);
@@ -274,8 +340,17 @@ public class TransactionCsvService {
         activity.record(ActivityAction.TRANSACTIONS_IMPORTED, user.getUsername(),
                 toSave.size() + " imported, " + skipped + " skipped, " + flagged + " flagged");
 
-        return new ImportResultDTO(toSave.size(), skipped, flagged, needsReview, errors,
-                columns.summary());
+        ImportResultDTO result = new ImportResultDTO(toSave.size(), skipped, flagged, needsReview,
+                errors, columns.summary());
+
+        // An import that imported nothing is not an import, and is not charged.
+        // Most files that fail reach this line rather than one of the early
+        // returns above: a header nobody recognises is not refused, it falls
+        // back to reading the columns by position, and then every row in turn
+        // fails to be a date. That is the commonest real failure there is, and
+        // charging for it is what locked people out of a feature they had never
+        // once got to work.
+        return toSave.isEmpty() ? abandon(charge, result) : result;
     }
 
     // -------------------------------------------------------------- reading

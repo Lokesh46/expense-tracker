@@ -114,6 +114,67 @@ class CsvUploadSafetyApiTest extends ApiTestBase {
     }
 
     @Test
+    @DisplayName("files that could not be read do not spend the allowance")
+    void failedImportsAreNotCharged() throws Exception {
+        String token = signUp("unlucky");
+
+        // Three distinct unreadable files -- distinct so each is genuinely
+        // charged and then handed back, rather than being waved through as a
+        // repeat of one the limiter had already seen.
+        for (int attempt = 1; attempt <= 3; attempt++) {
+            byte[] binary = new byte[] { 0x50, 0x4B, 0x03, 0x04, 0x00, 0x00, 0x08, (byte) attempt };
+
+            mockMvc.perform(multipart("/api/transactions/import")
+                    .file(file(binary))
+                    .header("Authorization", bearer(token)))
+                    .andExpect(status().isBadRequest());
+        }
+
+        // The allowance is two, so under the old behaviour this is a 429 for an
+        // account that has not managed to import a single row -- and, because
+        // only successful imports reach the activity log, with nothing anywhere
+        // to tell them why.
+        mockMvc.perform(multipart("/api/transactions/import")
+                .file(csv("""
+                        Date,Description,Category,Amount,Currency,Payment Method,Comments
+                        2026-08-10,Coffee,Groceries,3.50,GBP,Cash,
+                        """))
+                .header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.imported").value(1));
+    }
+
+    @Test
+    @DisplayName("a file that imports nothing does not spend the allowance")
+    void filesThatImportNothingAreNotCharged() throws Exception {
+        String token = signUp("mislabelled");
+
+        // The commonest real failure, and the one that decided where the line
+        // goes. A header the reader does not recognise is not refused: it falls
+        // back to reading columns by position, so the file is parsed in full and
+        // then every row fails to be a date. It answers 200 with an explanation
+        // rather than an error status, which is exactly why charging for it went
+        // unnoticed for so long.
+        for (int attempt = 1; attempt <= 3; attempt++) {
+            mockMvc.perform(multipart("/api/transactions/import")
+                    .file(csv("Alpha,Beta,Gamma\nx" + attempt + ",y,z\n"))
+                    .header("Authorization", bearer(token)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.imported").value(0))
+                    .andExpect(jsonPath("$.skipped").value(2));
+        }
+
+        mockMvc.perform(multipart("/api/transactions/import")
+                .file(csv("""
+                        Date,Description,Category,Amount,Currency,Payment Method,Comments
+                        2026-08-11,Bus,Travel,2.40,GBP,Cash,
+                        """))
+                .header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.imported").value(1));
+    }
+
+    @Test
     @DisplayName("one account's allowance is its own")
     void limitIsPerAccount() throws Exception {
         String busy = signUp("busy");

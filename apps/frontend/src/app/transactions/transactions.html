@@ -374,11 +374,12 @@
     description="CSV or PDF. The columns are read from the file's own header, so most bank exports work as they are."
     (closed)="isImportOpen.set(false)"
   >
-    <label class="dropzone">
+    <label class="dropzone" [class.is-busy]="isImporting()">
       <input
         type="file"
         accept=".csv,.pdf,text/csv,application/pdf"
         hidden
+        [disabled]="isImporting()"
         (change)="onFileSelected($event)"
       />
       <span class="dropzone-title">
