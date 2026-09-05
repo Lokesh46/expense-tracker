@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
@@ -58,7 +59,8 @@ public class RateLimiter {
      *
      * <p>The fingerprint is what a repeat request is recognised by, and is
      * cleared once the attempt it paid for has finished. Mutable, but only ever
-     * under the lock its deque is held by.
+     * from inside a remapping function, which is to say under the map's lock
+     * for the key this hit belongs to.
      */
     private static final class Hit {
         private final Instant at;
@@ -101,20 +103,23 @@ public class RateLimiter {
 
         Instant now = Instant.now();
         Instant cutoff = now.minus(WINDOW);
-        Deque<Hit> window = hits.computeIfAbsent(key, k -> new ArrayDeque<>());
 
-        // Locked on the account's own deque, so two accounts never contend.
-        synchronized (window) {
-            prune(window, cutoff);
+        hits.compute(key, (k, window) -> {
+            Deque<Hit> bucket = window == null ? new ArrayDeque<>() : window;
+            prune(bucket, cutoff);
 
-            if (fingerprint != null && find(window, fingerprint) != null) {
-                return;
+            if (fingerprint != null && find(bucket, fingerprint) != null) {
+                return bucket;
             }
-            if (window.size() >= maxPerWindow) {
+            if (bucket.size() >= maxPerWindow) {
+                // Thrown from inside the remapping function: the map records no
+                // change and the bucket keeps the hits it already had, which is
+                // what refusing a request should do.
                 throw new TooManyRequestsException(message);
             }
-            window.addLast(new Hit(now, fingerprint));
-        }
+            bucket.addLast(new Hit(now, fingerprint));
+            return bucket;
+        });
     }
 
     /**
@@ -136,16 +141,16 @@ public class RateLimiter {
      * be moved.
      */
     public void refund(String key, String fingerprint) {
-        Deque<Hit> window = hits.get(key);
-        if (window == null) {
-            return;
-        }
-        synchronized (window) {
+        hits.computeIfPresent(key, (k, window) -> {
             Hit charged = find(window, fingerprint);
             if (charged != null) {
                 window.remove(charged);
             }
-        }
+            // Null drops the bucket: a refund that empties one is the ordinary
+            // way an account's entry goes away, and leaving it makes the sweep
+            // the only thing that ever tidies up.
+            return window.isEmpty() ? null : window;
+        });
     }
 
     /**
@@ -158,28 +163,39 @@ public class RateLimiter {
      * is here to prevent.
      */
     public void settle(String key, String fingerprint) {
-        Deque<Hit> window = hits.get(key);
-        if (window == null) {
-            return;
-        }
-        synchronized (window) {
+        hits.computeIfPresent(key, (k, window) -> {
             Hit charged = find(window, fingerprint);
             if (charged != null) {
                 charged.fingerprint = null;
             }
-        }
+            return window;
+        });
     }
 
-    /** Drops buckets whose every entry has aged out. */
+    /**
+     * Drops buckets whose every entry has aged out.
+     *
+     * <p>One key at a time rather than {@code entrySet().removeIf}, which is
+     * the whole reason this is not a one-liner. {@code removeIf} decides
+     * whether to drop a bucket outside the lock that guards it, so a bucket
+     * could be found empty and removed in between another thread taking it from
+     * the map and writing its hit into it -- leaving that thread holding the
+     * only reference to a bucket nothing will read again, and the account
+     * quietly one attempt better off than it should be. {@code computeIfPresent}
+     * takes the same per-key lock {@link #require} does, so the two cannot
+     * interleave at all.
+     *
+     * <p>Over a snapshot of the keys, because the map is free to grow while
+     * this runs and a sweep should end.
+     */
     private void sweep() {
         Instant cutoff = Instant.now().minus(WINDOW);
-        hits.entrySet().removeIf(entry -> {
-            Deque<Hit> window = entry.getValue();
-            synchronized (window) {
+        for (String key : List.copyOf(hits.keySet())) {
+            hits.computeIfPresent(key, (k, window) -> {
                 prune(window, cutoff);
-                return window.isEmpty();
-            }
-        });
+                return window.isEmpty() ? null : window;
+            });
+        }
     }
 
     private static void prune(Deque<Hit> window, Instant cutoff) {

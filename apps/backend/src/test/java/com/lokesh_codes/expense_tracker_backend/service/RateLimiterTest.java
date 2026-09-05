@@ -1,7 +1,13 @@
 package com.lokesh_codes.expense_tracker_backend.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -105,6 +111,93 @@ class RateLimiterTest {
                 .doesNotThrowAnyException();
         assertThatCode(() -> limiter.settle("import:never-used", "nothing"))
                 .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("concurrent requests cannot spend more than the allowance")
+    void concurrentRequestsRespectTheLimit() throws Exception {
+        // Every hit is written inside the map's remapping function for its key,
+        // so the check and the write cannot be split by another thread. Before
+        // that, the bucket was fetched from the map and locked separately, and
+        // anything happening in the gap -- a sweep, in particular -- could drop
+        // a hit that had been counted.
+        int threads = 32;
+        int allowance = 5;
+        var limiter = new RateLimiter();
+        var start = new CountDownLatch(1);
+        var granted = new AtomicInteger();
+        var pool = Executors.newFixedThreadPool(threads);
+
+        try {
+            var done = new CountDownLatch(threads);
+            for (int i = 0; i < threads; i++) {
+                final String fingerprint = "file-" + i;
+                pool.execute(() -> {
+                    try {
+                        start.await();
+                        limiter.require(KEY, fingerprint, allowance, MESSAGE);
+                        granted.incrementAndGet();
+                    } catch (TooManyRequestsException expected) {
+                        // One of the ones over the line.
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    } finally {
+                        done.countDown();
+                    }
+                });
+            }
+
+            start.countDown();
+            assertThat(done.await(10, TimeUnit.SECONDS)).as("all threads finished").isTrue();
+        } finally {
+            pool.shutdownNow();
+        }
+
+        assertThat(granted.get())
+                .as("%d threads against an allowance of %d", threads, allowance)
+                .isEqualTo(allowance);
+    }
+
+    @Test
+    @DisplayName("concurrent refunds give back exactly what they took")
+    void concurrentRefundsRestoreTheAllowance() throws Exception {
+        int threads = 32;
+        var limiter = new RateLimiter();
+        var start = new CountDownLatch(1);
+        var done = new CountDownLatch(threads);
+        var pool = Executors.newFixedThreadPool(threads);
+
+        try {
+            for (int i = 0; i < threads; i++) {
+                final String fingerprint = "failed-" + i;
+                pool.execute(() -> {
+                    try {
+                        start.await();
+                        limiter.require(KEY, fingerprint, 4, MESSAGE);
+                        limiter.refund(KEY, fingerprint);
+                    } catch (TooManyRequestsException expected) {
+                        // Refused while others were mid-flight; nothing to undo.
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    } finally {
+                        done.countDown();
+                    }
+                });
+            }
+
+            start.countDown();
+            assertThat(done.await(10, TimeUnit.SECONDS)).as("all threads finished").isTrue();
+        } finally {
+            pool.shutdownNow();
+        }
+
+        // Every attempt was handed back, so the whole allowance is there again.
+        for (int attempt = 1; attempt <= 4; attempt++) {
+            final String fingerprint = "after-" + attempt;
+            assertThatCode(() -> limiter.require(KEY, fingerprint, 4, MESSAGE))
+                    .as("attempt %d of 4 after everything was refunded", attempt)
+                    .doesNotThrowAnyException();
+        }
     }
 
     @Test
