@@ -919,6 +919,16 @@ svg {
   background: var(--accent-muted);
 }
 
+/* Reading. The input inside is disabled, so the picker will not open — this is
+   only so the dropzone stops inviting the click that does nothing. */
+.dropzone.is-busy,
+.dropzone.is-busy:hover {
+  border-color: var(--rule-strong);
+  background: var(--surface-sunken);
+  cursor: progress;
+  opacity: 0.65;
+}
+
 .dropzone-title {
   font-weight: 600;
   font-size: var(--text-sm);

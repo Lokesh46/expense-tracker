@@ -489,6 +489,15 @@ export class TransactionsComponent {
   }
 
   private upload(file: File): void {
+    // A second request is a second import as far as the server is concerned,
+    // and the window to fire one is real: a cold instance can take most of a
+    // minute to answer, and Enter in the password box is not the button that
+    // gets disabled. The dropzone is disabled too — this is the case that
+    // slips past it.
+    if (this.isImporting()) {
+      return;
+    }
+
     this.isImporting.set(true);
     this.importErrors.set([]);
     this.importFlagged.set(0);
