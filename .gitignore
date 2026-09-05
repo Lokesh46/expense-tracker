@@ -24,7 +24,7 @@ apps/backend/data/
 Thumbs.db
 
 # --- claude code ---
-.claude/settings.local.json
+.claude/
 
 # --- logs ---
 *.log
